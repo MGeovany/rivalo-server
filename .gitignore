@@ -1,0 +1,26 @@
+# macOS
+.DS_Store
+
+# Go binaries
+/bin/
+/server
+*.exe
+*.test
+*.out
+
+# Go workspace
+go.work
+go.work.sum
+
+# Coverage
+coverage.out
+coverage.html
+
+# Env / secrets
+.env
+.env.local
+*.local.yaml
+
+# IDE
+.idea/
+.vscode/
