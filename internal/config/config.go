@@ -3,6 +3,8 @@ package config
 
 import (
 	"os"
+
+	"github.com/joho/godotenv"
 )
 
 // Config holds the runtime configuration for the server.
@@ -19,7 +21,12 @@ type Config struct {
 }
 
 // Load reads configuration from the environment, applying sensible defaults.
+// As a development convenience it first loads a local .env file when present;
+// a missing file is not an error, and real environments provide variables
+// directly so the file is never required.
 func Load() Config {
+	_ = godotenv.Load()
+
 	return Config{
 		Port:              getenv("PORT", "8080"),
 		DatabaseURL:       os.Getenv("DATABASE_URL"),

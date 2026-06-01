@@ -1,6 +1,6 @@
 .PHONY: run test build tidy
 
-run:
+dev:
 	go run ./cmd/server
 
 test:
