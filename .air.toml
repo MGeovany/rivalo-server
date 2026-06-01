@@ -1,0 +1,13 @@
+# Live reload for local development (make dev).
+root = "."
+tmp_dir = "tmp"
+
+[build]
+  cmd = "go build -o ./tmp/main ./cmd/server"
+  bin = "./tmp/main"
+  include_ext = ["go"]
+  exclude_dir = ["tmp", "bin", "vendor"]
+  delay = 500
+
+[log]
+  time = false

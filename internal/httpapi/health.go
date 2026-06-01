@@ -2,7 +2,6 @@ package httpapi
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"time"
 )
@@ -23,6 +22,13 @@ type healthResponse struct {
 // configured, its reachability. The endpoint always returns 200 as long as the
 // process is serving requests; the database field communicates dependency state
 // without failing the liveness probe.
+//
+//	@Summary		Service health
+//	@Description	Liveness probe. The database field is disabled, ok, or unreachable.
+//	@Tags			health
+//	@Produce		json
+//	@Success		200	{object}	healthResponse
+//	@Router			/health [get]
 func healthHandler(db Pinger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		dbStatus := "disabled"
@@ -41,11 +47,4 @@ func healthHandler(db Pinger) http.HandlerFunc {
 			Database: dbStatus,
 		})
 	}
-}
-
-// writeJSON serializes v as JSON and writes it with the given status code.
-func writeJSON(w http.ResponseWriter, status int, v any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(v)
 }

@@ -9,6 +9,16 @@ físico de fútbol amateur.
 - PostgreSQL administrado con Supabase
 - Autenticación basada en JWT de Supabase Auth
 
+## API docs (Swagger)
+
+With the server running (`make dev`), open [http://localhost:8080/docs](http://localhost:8080/docs) (or `/docs/index.html`).
+
+After changing handler annotations, regenerate the spec:
+
+```bash
+make swagger
+```
+
 ## Endpoints (inicial)
 
 - `GET /health`
@@ -24,6 +34,13 @@ físico de fútbol amateur.
 ## Desarrollo
 
 Requiere Go y un proyecto Supabase. Configuración por variables de entorno (ver `.env` local).
+
+```bash
+make dev    # servidor con recarga al guardar cambios en .go (Air)
+make run    # una sola ejecución, sin watch
+```
+
+Tras cambiar anotaciones Swagger, corre `make swagger` y Air recargará en el siguiente guardado de un `.go`, o toca cualquier archivo en `internal/` / `cmd/` para forzar el rebuild.
 
 ## Estado
 

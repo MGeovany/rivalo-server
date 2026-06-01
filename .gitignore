@@ -3,6 +3,7 @@
 
 # Go binaries
 /bin/
+/tmp/
 /server
 *.exe
 *.test

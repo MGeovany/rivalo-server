@@ -1,0 +1,129 @@
+basePath: /
+definitions:
+  httpapi.errorResponse:
+    properties:
+      error:
+        type: string
+    type: object
+  httpapi.healthResponse:
+    properties:
+      database:
+        type: string
+      status:
+        type: string
+    type: object
+  httpapi.updateProfileRequest:
+    properties:
+      display_name:
+        type: string
+      height_cm:
+        type: integer
+      preferred_position:
+        type: string
+      weight_kg:
+        type: number
+    type: object
+  profile.Profile:
+    properties:
+      created_at:
+        type: string
+      display_name:
+        type: string
+      height_cm:
+        type: integer
+      id:
+        type: string
+      preferred_position:
+        type: string
+      updated_at:
+        type: string
+      weight_kg:
+        type: number
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: Backend API for Rivalo (profiles, sessions, health).
+  title: Rivalo API
+  version: 0.1.0
+paths:
+  /health:
+    get:
+      description: Liveness probe. The database field is disabled, ok, or unreachable.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpapi.healthResponse'
+      summary: Service health
+      tags:
+      - health
+  /v1/me:
+    get:
+      description: Returns the authenticated user's profile, creating a default one
+        on first access.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/profile.Profile'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpapi.errorResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/httpapi.errorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get my profile
+      tags:
+      - profile
+    put:
+      consumes:
+      - application/json
+      description: Updates the authenticated user's profile fields.
+      parameters:
+      - description: Profile fields
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.updateProfileRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/profile.Profile'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpapi.errorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpapi.errorResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/httpapi.errorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update my profile
+      tags:
+      - profile
+schemes:
+- http
+securityDefinitions:
+  BearerAuth:
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

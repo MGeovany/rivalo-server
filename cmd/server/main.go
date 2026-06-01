@@ -1,4 +1,15 @@
 // Command server starts the Rivalo HTTP API.
+//
+//	@title			Rivalo API
+//	@version		0.1.0
+//	@description	Backend API for Rivalo (profiles, sessions, health).
+//	@host			localhost:8080
+//	@BasePath		/
+//	@schemes		http
+//
+//	@securityDefinitions.apikey	BearerAuth
+//	@in							header
+//	@name						Authorization
 package main
 
 import (
@@ -11,9 +22,11 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/MGeovany/rivalo-server/internal/auth"
 	"github.com/MGeovany/rivalo-server/internal/config"
 	"github.com/MGeovany/rivalo-server/internal/db"
 	"github.com/MGeovany/rivalo-server/internal/httpapi"
+	"github.com/MGeovany/rivalo-server/internal/profile"
 )
 
 func main() {
@@ -29,6 +42,7 @@ func run() error {
 	// connect and expose it to handlers; otherwise the API still serves
 	// stateless endpoints such as /health.
 	var pinger httpapi.Pinger
+	var profiles profile.Store
 	if cfg.DatabaseURL != "" {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
@@ -39,14 +53,19 @@ func run() error {
 		}
 		defer database.Close()
 		pinger = database
+		profiles = profile.NewPostgresStore(database.Pool)
 		log.Println("connected to database")
 	} else {
 		log.Println("DATABASE_URL not set; running without database")
 	}
 
 	srv := &http.Server{
-		Addr:              ":" + cfg.Port,
-		Handler:           httpapi.NewRouter(pinger),
+		Addr: ":" + cfg.Port,
+		Handler: httpapi.NewRouter(httpapi.Deps{
+			DB:       pinger,
+			Profiles: profiles,
+			Verifier: auth.NewVerifier(cfg.SupabaseJWTSecret),
+		}),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 

@@ -17,7 +17,7 @@ type stubPinger struct {
 func (s stubPinger) Ping(context.Context) error { return s.err }
 
 func TestHealth_NoDatabase(t *testing.T) {
-	rec := doHealthRequest(t, NewRouter(nil))
+	rec := doHealthRequest(t, NewRouter(Deps{DB: nil}))
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
@@ -32,7 +32,7 @@ func TestHealth_NoDatabase(t *testing.T) {
 }
 
 func TestHealth_DatabaseReachable(t *testing.T) {
-	rec := doHealthRequest(t, NewRouter(stubPinger{err: nil}))
+	rec := doHealthRequest(t, NewRouter(Deps{DB: stubPinger{err: nil}}))
 
 	body := decodeHealth(t, rec)
 	if body.Database != "ok" {
@@ -41,7 +41,7 @@ func TestHealth_DatabaseReachable(t *testing.T) {
 }
 
 func TestHealth_DatabaseUnreachable(t *testing.T) {
-	rec := doHealthRequest(t, NewRouter(stubPinger{err: errors.New("boom")}))
+	rec := doHealthRequest(t, NewRouter(Deps{DB: stubPinger{err: errors.New("boom")}}))
 
 	if rec.Code != http.StatusOK {
 		t.Errorf("status = %d, want %d (health stays live even if db is down)", rec.Code, http.StatusOK)
