@@ -123,6 +123,7 @@ type New struct {
 	HalftimeOffsetS *int
 	Samples      []Sample
 	MatchRating  *float64
+	PitchID      *string
 }
 
 // Store persists sport sessions.

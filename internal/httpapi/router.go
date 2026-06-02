@@ -10,17 +10,19 @@ import (
 
 	"github.com/MGeovany/rivalo-server/internal/auth"
 	"github.com/MGeovany/rivalo-server/internal/logger"
+	"github.com/MGeovany/rivalo-server/internal/pitch"
 	"github.com/MGeovany/rivalo-server/internal/profile"
 	"github.com/MGeovany/rivalo-server/internal/session"
 )
 
-// Deps holds the dependencies the HTTP handlers need. DB, Profiles and Sessions
-// may be nil in environments without a configured database; in that case
+// Deps holds the dependencies the HTTP handlers need. DB, Profiles, Sessions and
+// Pitches may be nil in environments without a configured database; in that case
 // /health reports the database as disabled and the data endpoints return 503.
 type Deps struct {
 	DB       Pinger
 	Profiles profile.Store
 	Sessions session.Store
+	Pitches  pitch.Store
 	Verifier auth.Verifier
 }
 
@@ -32,6 +34,12 @@ func NewRouter(d Deps) http.Handler {
 
 	mux.HandleFunc("GET /v1/me", d.requireAuth(d.handleGetMe))
 	mux.HandleFunc("PUT /v1/me", d.requireAuth(d.handleUpdateMe))
+
+	mux.HandleFunc("POST /v1/pitches", d.requireAuth(d.handleCreatePitch))
+	mux.HandleFunc("GET /v1/pitches", d.requireAuth(d.handleListPitches))
+	mux.HandleFunc("GET /v1/pitches/{id}", d.requireAuth(d.handleGetPitch))
+	mux.HandleFunc("PUT /v1/pitches/{id}", d.requireAuth(d.handleUpdatePitch))
+	mux.HandleFunc("DELETE /v1/pitches/{id}", d.requireAuth(d.handleDeletePitch))
 
 	mux.HandleFunc("POST /v1/sessions", d.requireAuth(d.handleCreateSession))
 	mux.HandleFunc("GET /v1/sessions", d.requireAuth(d.handleListSessions))

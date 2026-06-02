@@ -28,8 +28,8 @@ func (s *PostgresStore) Create(ctx context.Context, userID string, n New) (Sessi
 		insert into public.sessions
 			(user_id, started_at, ended_at, duration_s, distance_m,
 			 hr_avg, hr_max, speed_max_kmh, sprints, intensity, calories_kcal, source,
-			 mode, halftime_offset_s, match_rating)
-		values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+			 mode, halftime_offset_s, match_rating, pitch_id)
+		values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
 		returning ` + sessionColumns
 
 	tx, err := s.pool.Begin(ctx)
@@ -41,7 +41,7 @@ func (s *PostgresStore) Create(ctx context.Context, userID string, n New) (Sessi
 	sess, err := scanSession(tx.QueryRow(ctx, query,
 		userID, n.StartedAt, n.EndedAt, n.DurationS, n.DistanceM,
 		n.HRAvg, n.HRMax, n.SpeedMaxKMH, n.Sprints, n.Intensity, n.CaloriesKcal, n.Source,
-		n.Mode, n.HalftimeOffsetS, n.MatchRating,
+		n.Mode, n.HalftimeOffsetS, n.MatchRating, n.PitchID,
 	))
 	if err != nil {
 		return Session{}, err

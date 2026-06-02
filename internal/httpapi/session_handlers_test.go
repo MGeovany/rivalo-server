@@ -46,6 +46,7 @@ func (f *fakeSessionStore) Create(_ context.Context, userID string, n session.Ne
 		Mode:         n.Mode,
 		HalftimeOffsetS: n.HalftimeOffsetS,
 		MatchRating:  n.MatchRating,
+		PitchID:      n.PitchID,
 		Samples:      n.Samples,
 		CreatedAt:    n.StartedAt,
 	}

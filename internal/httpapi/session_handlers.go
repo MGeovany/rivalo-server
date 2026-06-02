@@ -25,6 +25,7 @@ type createSessionRequest struct {
 	Mode            string `json:"mode"`
 	HalftimeOffsetS *int   `json:"halftime_offset_s"`
 	Samples      []sampleRequest `json:"samples"`
+	PitchID      *string         `json:"pitch_id"`
 }
 
 // sampleRequest is one time-series point in a create-session payload.
@@ -68,6 +69,19 @@ func (d Deps) handleCreateSession(w http.ResponseWriter, r *http.Request) {
 	}
 
 	uid := userID(r.Context())
+
+	// Validate pitch_id belongs to user if provided.
+	if newSession.PitchID != nil {
+		if d.Pitches == nil {
+			logAndWriteError(w, http.StatusServiceUnavailable, "pitches are not available", "session_create_rejected", nil, "reason", "pitches_unavailable")
+			return
+		}
+		owns, err := d.Pitches.OwnedByUser(r.Context(), uid, *newSession.PitchID)
+		if err != nil || !owns {
+			logAndWriteError(w, http.StatusBadRequest, "pitch_id not found or not owned", "session_create_rejected", nil, "reason", "invalid_pitch_id")
+			return
+		}
+	}
 
 	// Compute match_rating if we have HR samples and a profile/birth_year.
 	rating := computeMatchRating(r, d, uid, newSession)
@@ -268,6 +282,20 @@ func (d Deps) handlePatchSessionContext(w http.ResponseWriter, r *http.Request) 
 
 	uid := userID(r.Context())
 	id := r.PathValue("id")
+
+	// Validate pitch_id belongs to user if changed.
+	if cu.PitchID != nil {
+		if d.Pitches == nil {
+			logAndWriteError(w, http.StatusServiceUnavailable, "pitches are not available", "session_patch_rejected", nil, "reason", "pitches_unavailable")
+			return
+		}
+		owns, err := d.Pitches.OwnedByUser(r.Context(), uid, *cu.PitchID)
+		if err != nil || !owns {
+			logAndWriteError(w, http.StatusBadRequest, "pitch_id not found or not owned", "session_patch_rejected", nil, "reason", "invalid_pitch_id")
+			return
+		}
+	}
+
 	updated, err := d.Sessions.UpdateContext(r.Context(), uid, id, cu)
 	if errors.Is(err, session.ErrNotFound) {
 		logAndWriteError(w, http.StatusNotFound, "session not found", "session_patch_not_found", err, logger.Ref("user", uid), logger.Ref("session", id))
@@ -429,6 +457,7 @@ func (req createSessionRequest) validate() (session.New, string) {
 		Mode:         mode,
 		HalftimeOffsetS: req.HalftimeOffsetS,
 		Samples:      samples,
+		PitchID:      req.PitchID,
 	}, ""
 }
 
