@@ -4,6 +4,8 @@ import (
 	"context"
 	"net/http"
 	"strings"
+
+	"github.com/MGeovany/rivalo-server/internal/logger"
 )
 
 // contextKey is an unexported type for context keys defined in this package.
@@ -16,18 +18,21 @@ const userIDKey contextKey = "userID"
 func (d Deps) requireAuth(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !d.Verifier.Configured() {
+			logger.Warn("auth_rejected", "reason", "not_configured", "path", r.URL.Path)
 			writeError(w, http.StatusServiceUnavailable, "authentication is not configured")
 			return
 		}
 
 		token, ok := bearerToken(r.Header.Get("Authorization"))
 		if !ok {
+			logger.Warn("auth_rejected", "reason", "missing_token", "path", r.URL.Path)
 			writeError(w, http.StatusUnauthorized, "missing bearer token")
 			return
 		}
 
 		userID, err := d.Verifier.Verify(token)
 		if err != nil {
+			logger.Warn("auth_rejected", "reason", "invalid_token", "path", r.URL.Path)
 			writeError(w, http.StatusUnauthorized, "invalid token")
 			return
 		}

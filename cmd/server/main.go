@@ -15,7 +15,7 @@ package main
 import (
 	"context"
 	"errors"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -26,12 +26,15 @@ import (
 	"github.com/MGeovany/rivalo-server/internal/config"
 	"github.com/MGeovany/rivalo-server/internal/db"
 	"github.com/MGeovany/rivalo-server/internal/httpapi"
+	"github.com/MGeovany/rivalo-server/internal/logger"
 	"github.com/MGeovany/rivalo-server/internal/profile"
 )
 
 func main() {
+	logger.Init()
 	if err := run(); err != nil {
-		log.Fatalf("server error: %v", err)
+		logger.Error("server_exit", logger.SafeErr(err))
+		os.Exit(1)
 	}
 }
 
@@ -49,22 +52,26 @@ func run() error {
 
 		database, err := db.Connect(ctx, cfg.DatabaseURL)
 		if err != nil {
+			logger.Error("database_connect_failed", logger.SafeErr(err))
 			return err
 		}
 		defer database.Close()
 		pinger = database
 		profiles = profile.NewPostgresStore(database.Pool)
-		log.Println("connected to database")
+		logger.Info("database_ready")
 	} else {
-		log.Println("DATABASE_URL not set; running without database")
+		logger.Warn("database_disabled")
 	}
+
+	verifier := auth.NewVerifier(cfg.SupabaseJWTSecret)
+	logger.Info("auth_ready", slog.Bool("configured", verifier.Configured()))
 
 	srv := &http.Server{
 		Addr: ":" + cfg.Port,
 		Handler: httpapi.NewRouter(httpapi.Deps{
 			DB:       pinger,
 			Profiles: profiles,
-			Verifier: auth.NewVerifier(cfg.SupabaseJWTSecret),
+			Verifier: verifier,
 		}),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
@@ -75,15 +82,17 @@ func run() error {
 		stop := make(chan os.Signal, 1)
 		signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
 		<-stop
+		logger.Info("shutdown_signal")
 
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 		shutdownErr <- srv.Shutdown(ctx)
 	}()
 
-	log.Printf("listening on :%s", cfg.Port)
+	logger.Info("server_listening", slog.String("port", cfg.Port))
 	if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		return err
 	}
+	logger.Info("server_stopped")
 	return <-shutdownErr
 }

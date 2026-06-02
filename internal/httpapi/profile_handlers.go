@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/MGeovany/rivalo-server/internal/logger"
 	"github.com/MGeovany/rivalo-server/internal/profile"
 )
 
@@ -29,15 +30,19 @@ type updateProfileRequest struct {
 //	@Router			/v1/me [get]
 func (d Deps) handleGetMe(w http.ResponseWriter, r *http.Request) {
 	if d.Profiles == nil {
+		logger.Warn("profile_get_unavailable")
 		writeError(w, http.StatusServiceUnavailable, "profiles are not available")
 		return
 	}
 
-	p, err := d.Profiles.GetOrCreate(r.Context(), userID(r.Context()))
+	uid := userID(r.Context())
+	p, err := d.Profiles.GetOrCreate(r.Context(), uid)
 	if err != nil {
+		logger.Error("profile_get_failed", logger.Ref("user", uid), logger.SafeErr(err))
 		writeError(w, http.StatusInternalServerError, "could not load profile")
 		return
 	}
+	logger.Info("profile_get_ok", logger.Ref("user", uid))
 	writeJSON(w, http.StatusOK, p)
 }
 
@@ -57,27 +62,33 @@ func (d Deps) handleGetMe(w http.ResponseWriter, r *http.Request) {
 //	@Router			/v1/me [put]
 func (d Deps) handleUpdateMe(w http.ResponseWriter, r *http.Request) {
 	if d.Profiles == nil {
+		logger.Warn("profile_update_unavailable")
 		writeError(w, http.StatusServiceUnavailable, "profiles are not available")
 		return
 	}
 
 	var req updateProfileRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		logger.Warn("profile_update_rejected", "reason", "invalid_json")
 		writeError(w, http.StatusBadRequest, "invalid JSON body")
 		return
 	}
 
 	update, msg := req.validate()
 	if msg != "" {
+		logger.Warn("profile_update_rejected", "reason", "validation_failed")
 		writeError(w, http.StatusBadRequest, msg)
 		return
 	}
 
-	p, err := d.Profiles.Update(r.Context(), userID(r.Context()), update)
+	uid := userID(r.Context())
+	p, err := d.Profiles.Update(r.Context(), uid, update)
 	if err != nil {
+		logger.Error("profile_update_failed", logger.Ref("user", uid), logger.SafeErr(err))
 		writeError(w, http.StatusInternalServerError, "could not update profile")
 		return
 	}
+	logger.Info("profile_update_ok", logger.Ref("user", uid))
 	writeJSON(w, http.StatusOK, p)
 }
 
