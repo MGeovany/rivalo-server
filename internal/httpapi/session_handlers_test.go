@@ -1055,6 +1055,99 @@ func TestCreateSession_FirstSession_NoNewRecords(t *testing.T) {
 	}
 }
 
+func TestCreateSession_MatchInsights_ThreePrior(t *testing.T) {
+	store := newFakeSessionStore()
+	token := signToken(t, testSecret, "user-1", time.Now().Add(time.Hour))
+	// Create 3 prior sessions with modest metrics.
+	for range 3 {
+		_ = createForMetrics(t, store, token, 5000, 10, 3600)
+	}
+	// Create a standout session.
+	body := validSessionBody()
+	body.DistanceM = 9500
+	body.Sprints = 30
+	body.DurationS = 5400
+	body.EndedAt = body.StartedAt.Add(90 * time.Minute)
+	body.HRAvg = intPtr(160)
+	body.HRMax = intPtr(195)
+	body.Samples = []sampleRequest{
+		{TOffsetS: 0, HR: intPtr(140)},
+		{TOffsetS: 300, HR: intPtr(160)},
+		{TOffsetS: 600, HR: intPtr(180)},
+	}
+	rec := doRequest(t, sessionDeps(store), http.MethodPost, "/v1/sessions", "Bearer "+token, body)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want 201; body = %s", rec.Code, rec.Body.String())
+	}
+	var s session.Session
+	if err := json.NewDecoder(rec.Body).Decode(&s); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(s.MatchInsights) == 0 {
+		t.Fatal("expected match_insights with 3 prior sessions, got none")
+	}
+	var kinds []string
+	for _, in := range s.MatchInsights {
+		kinds = append(kinds, in.Kind)
+	}
+	if !contains(kinds, "distance_burst") {
+		t.Fatalf("expected distance_burst insight, got %v", kinds)
+	}
+	if !contains(kinds, "sprint_peak") {
+		t.Fatalf("expected sprint_peak insight, got %v", kinds)
+	}
+}
+
+func TestCreateSession_MatchInsights_FirstSession_NoInsights(t *testing.T) {
+	store := newFakeSessionStore()
+	token := signToken(t, testSecret, "user-1", time.Now().Add(time.Hour))
+	created := createForMetrics(t, store, token, 5000, 5, 3000)
+	if len(created.MatchInsights) != 0 {
+		t.Fatalf("first session should not have match insights, got %v", created.MatchInsights)
+	}
+}
+
+func TestCreateSession_MatchInsights_OnlyTwoTotal_NoInsights(t *testing.T) {
+	store := newFakeSessionStore()
+	token := signToken(t, testSecret, "user-1", time.Now().Add(time.Hour))
+	_ = createForMetrics(t, store, token, 5000, 5, 3000)
+	created := createForMetrics(t, store, token, 8000, 15, 4000)
+	if len(created.MatchInsights) != 0 {
+		t.Fatalf("only 2 total sessions should not have match insights, got %v", created.MatchInsights)
+	}
+}
+
+func TestCreateSession_MatchInsights_ModestSession_NoInsights(t *testing.T) {
+	store := newFakeSessionStore()
+	token := signToken(t, testSecret, "user-1", time.Now().Add(time.Hour))
+	for range 3 {
+		_ = createForMetrics(t, store, token, 5000, 10, 3600)
+	}
+	created := createForMetrics(t, store, token, 5200, 11, 3700)
+	if len(created.MatchInsights) != 0 {
+		t.Fatalf("modest session should not trigger insights, got %v", created.MatchInsights)
+	}
+}
+
+// createForMetrics is like createForRecords but accepts distance, sprints, duration.
+func createForMetrics(t *testing.T, store *fakeSessionStore, token string, distance float64, sprints, durationS int) session.Session {
+	t.Helper()
+	body := validSessionBody()
+	body.DistanceM = distance
+	body.Sprints = sprints
+	body.DurationS = durationS
+	body.EndedAt = body.StartedAt.Add(time.Duration(durationS) * time.Second)
+	rec := doRequest(t, sessionDeps(store), http.MethodPost, "/v1/sessions", "Bearer "+token, body)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("create status = %d, want 201; body = %s", rec.Code, rec.Body.String())
+	}
+	var created session.Session
+	if err := json.NewDecoder(rec.Body).Decode(&created); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	return created
+}
+
 func TestCreateSession_BeatsDistance_FlagsNewRecord(t *testing.T) {
 	store := newFakeSessionStore()
 	token := signToken(t, testSecret, "user-1", time.Now().Add(time.Hour))

@@ -110,6 +110,17 @@ func (d Deps) handleCreateSession(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 		}
+		// Post-match insights: compare the just-created session against prior
+		// sessions. At least MinMatchInsightPrior prior sessions are required.
+		var prior []session.Session
+		for _, s := range existing {
+			if s.ID != created.ID {
+				prior = append(prior, s)
+			}
+		}
+		if ins := session.BuildMatchInsights(created, prior); ins != nil {
+			created.MatchInsights = ins
+		}
 	}
 
 	logger.Info("session_create_ok", logger.Ref("user", uid), logger.Ref("session", created.ID))

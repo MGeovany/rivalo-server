@@ -128,6 +128,10 @@ type Session struct {
 	// NewRecords lists the personal-best metrics this session broke. Populated
 	// only on the create response when the user already had prior history.
 	NewRecords []string `json:"new_records,omitempty"`
+	// MatchInsights lists 1-3 short observations comparing this session to the
+	// user's historical averages. Populated only on the create response,
+	// empty/nil when there are fewer than 3 total sessions.
+	MatchInsights []MatchInsight `json:"match_insights,omitempty"`
 }
 
 // New carries the fields needed to create a session.
@@ -208,6 +212,14 @@ type Insight struct {
 	Kind   string `json:"kind"`
 	Title  string `json:"title"`
 	Detail string `json:"detail"`
+}
+
+// MatchInsight is a short explainable observation comparing a just-completed
+// session to the user's historical data (no AI/ML).
+type MatchInsight struct {
+	Kind    string `json:"kind"`
+	Title   string `json:"title"`
+	Message string `json:"message"`
 }
 
 // Store persists sport sessions.
