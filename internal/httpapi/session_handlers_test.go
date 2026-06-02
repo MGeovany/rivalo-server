@@ -112,6 +112,117 @@ func (f *fakeSessionStore) UpdateContext(_ context.Context, userID, id string, c
 	return session.Session{}, session.ErrNotFound
 }
 
+func (f *fakeSessionStore) GetPersonalRecords(_ context.Context, userID string) (session.PersonalRecords, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	list := f.items[userID]
+	if len(list) == 0 {
+		return session.PersonalRecords{Records: nil}, nil
+	}
+
+	var (
+		bestDist     float64
+		distSid      string
+		distDate     time.Time
+		bestDur      float64
+		durSid       string
+		durDate      time.Time
+		bestSpeed    *float64
+		speedSid     *string
+		speedDate    *time.Time
+		bestSprints  float64
+		sprintSid    string
+		sprintDate   time.Time
+		bestInt      *float64
+		intSid       *string
+		intDate      *time.Time
+		bestRating   *float64
+		ratingSid    *string
+		ratingDate   *time.Time
+		bestHRMax    *float64
+		hrSid        *string
+		hrDate       *time.Time
+		bestCals     *float64
+		calsSid      *string
+		calsDate     *time.Time
+	)
+
+	for _, s := range list {
+		if s.DistanceM > bestDist {
+			bestDist = s.DistanceM
+			distSid = s.ID
+			distDate = s.StartedAt
+		}
+		if float64(s.DurationS) > bestDur {
+			bestDur = float64(s.DurationS)
+			durSid = s.ID
+			durDate = s.StartedAt
+		}
+		if s.SpeedMaxKMH != nil && (bestSpeed == nil || *s.SpeedMaxKMH > *bestSpeed) {
+			v := *s.SpeedMaxKMH
+			bestSpeed = &v
+			speedSid = &s.ID
+			speedDate = &s.StartedAt
+		}
+		if float64(s.Sprints) > bestSprints {
+			bestSprints = float64(s.Sprints)
+			sprintSid = s.ID
+			sprintDate = s.StartedAt
+		}
+		if s.Intensity != nil && (bestInt == nil || *s.Intensity > *bestInt) {
+			v := *s.Intensity
+			bestInt = &v
+			intSid = &s.ID
+			intDate = &s.StartedAt
+		}
+		if s.MatchRating != nil && (bestRating == nil || *s.MatchRating > *bestRating) {
+			v := *s.MatchRating
+			bestRating = &v
+			ratingSid = &s.ID
+			ratingDate = &s.StartedAt
+		}
+		if s.HRMax != nil && (bestHRMax == nil || float64(*s.HRMax) > *bestHRMax) {
+			v := float64(*s.HRMax)
+			bestHRMax = &v
+			hrSid = &s.ID
+			hrDate = &s.StartedAt
+		}
+		if s.CaloriesKcal != nil && (bestCals == nil || *s.CaloriesKcal > *bestCals) {
+			v := *s.CaloriesKcal
+			bestCals = &v
+			calsSid = &s.ID
+			calsDate = &s.StartedAt
+		}
+	}
+
+	records := make([]session.RecordEntry, 0, 9)
+
+	add := func(metric string, value float64, sid string, date time.Time) {
+		records = append(records, session.RecordEntry{Metric: metric, Value: value, SessionID: sid, StartedAt: date})
+	}
+
+	add("distance_m", bestDist, distSid, distDate)
+	add("duration_s", bestDur, durSid, durDate)
+	if bestSpeed != nil {
+		add("speed_max_kmh", *bestSpeed, *speedSid, *speedDate)
+	}
+	add("sprints", bestSprints, sprintSid, sprintDate)
+	if bestInt != nil {
+		add("intensity", *bestInt, *intSid, *intDate)
+	}
+	if bestRating != nil {
+		add("match_rating", *bestRating, *ratingSid, *ratingDate)
+	}
+	if bestHRMax != nil {
+		add("hr_max", *bestHRMax, *hrSid, *hrDate)
+	}
+	if bestCals != nil {
+		add("calories_kcal", *bestCals, *calsSid, *calsDate)
+	}
+
+	return session.PersonalRecords{Records: records}, nil
+}
+
 func (f *fakeSessionStore) Delete(_ context.Context, userID, id string) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()

@@ -3,6 +3,7 @@ package session
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -195,6 +196,119 @@ func (s *PostgresStore) Delete(ctx context.Context, userID, id string) error {
 		return ErrNotFound
 	}
 	return nil
+}
+
+func (s *PostgresStore) GetPersonalRecords(ctx context.Context, userID string) (PersonalRecords, error) {
+	const query = `
+		with ranked as (
+			select
+				distance_m, duration_s::float8, speed_max_kmh, sprints::float8,
+				intensity, match_rating::float8, hr_max::float8, calories_kcal,
+				id, started_at
+			from public.sessions
+			where user_id = $1
+		)
+		select
+			(select distance_m   from ranked where distance_m   is not null order by distance_m   desc nulls last limit 1) as best_distance,
+			(select id           from ranked where distance_m   is not null order by distance_m   desc nulls last limit 1) as distance_sid,
+			(select started_at   from ranked where distance_m   is not null order by distance_m   desc nulls last limit 1) as distance_date,
+			(select duration_s   from ranked where duration_s   is not null order by duration_s   desc nulls last limit 1) as best_duration,
+			(select id           from ranked where duration_s   is not null order by duration_s   desc nulls last limit 1) as duration_sid,
+			(select started_at   from ranked where duration_s   is not null order by duration_s   desc nulls last limit 1) as duration_date,
+			(select speed_max_kmh from ranked where speed_max_kmh is not null order by speed_max_kmh desc nulls last limit 1) as best_speed,
+			(select id           from ranked where speed_max_kmh is not null order by speed_max_kmh desc nulls last limit 1) as speed_sid,
+			(select started_at   from ranked where speed_max_kmh is not null order by speed_max_kmh desc nulls last limit 1) as speed_date,
+			(select sprints      from ranked where sprints       is not null order by sprints      desc nulls last limit 1) as best_sprints,
+			(select id           from ranked where sprints       is not null order by sprints      desc nulls last limit 1) as sprints_sid,
+			(select started_at   from ranked where sprints       is not null order by sprints      desc nulls last limit 1) as sprints_date,
+			(select intensity    from ranked where intensity     is not null order by intensity    desc nulls last limit 1) as best_intensity,
+			(select id           from ranked where intensity     is not null order by intensity    desc nulls last limit 1) as intensity_sid,
+			(select started_at   from ranked where intensity     is not null order by intensity    desc nulls last limit 1) as intensity_date,
+			(select match_rating from ranked where match_rating  is not null order by match_rating desc nulls last limit 1) as best_rating,
+			(select id           from ranked where match_rating  is not null order by match_rating desc nulls last limit 1) as rating_sid,
+			(select started_at   from ranked where match_rating  is not null order by match_rating desc nulls last limit 1) as rating_date,
+			(select hr_max       from ranked where hr_max        is not null order by hr_max       desc nulls last limit 1) as best_hr_max,
+			(select id           from ranked where hr_max        is not null order by hr_max       desc nulls last limit 1) as hr_max_sid,
+			(select started_at   from ranked where hr_max        is not null order by hr_max       desc nulls last limit 1) as hr_max_date,
+			(select calories_kcal from ranked where calories_kcal is not null order by calories_kcal desc nulls last limit 1) as best_calories,
+			(select id           from ranked where calories_kcal is not null order by calories_kcal desc nulls last limit 1) as calories_sid,
+			(select started_at   from ranked where calories_kcal is not null order by calories_kcal desc nulls last limit 1) as calories_date
+	`
+
+	var (
+		bestDistance   float64
+		distanceSid    *string
+		distanceDate   *time.Time
+		bestDuration   float64
+		durationSid    *string
+		durationDate   *time.Time
+		bestSpeed      *float64
+		speedSid       *string
+		speedDate      *time.Time
+		bestSprints    float64
+		sprintsSid     *string
+		sprintsDate    *time.Time
+		bestIntensity  *float64
+		intensitySid   *string
+		intensityDate  *time.Time
+		bestRating     *float64
+		ratingSid      *string
+		ratingDate     *time.Time
+		bestHRMax      *float64
+		hrMaxSid       *string
+		hrMaxDate      *time.Time
+		bestCalories   *float64
+		caloriesSid    *string
+		caloriesDate   *time.Time
+	)
+
+	err := s.pool.QueryRow(ctx, query, userID).Scan(
+		&bestDistance, &distanceSid, &distanceDate,
+		&bestDuration, &durationSid, &durationDate,
+		&bestSpeed, &speedSid, &speedDate,
+		&bestSprints, &sprintsSid, &sprintsDate,
+		&bestIntensity, &intensitySid, &intensityDate,
+		&bestRating, &ratingSid, &ratingDate,
+		&bestHRMax, &hrMaxSid, &hrMaxDate,
+		&bestCalories, &caloriesSid, &caloriesDate,
+	)
+	if err != nil {
+		return PersonalRecords{}, err
+	}
+
+	records := make([]RecordEntry, 0, 9)
+
+	add := func(metric string, value float64, sid *string, date *time.Time) {
+		if sid != nil && date != nil {
+			records = append(records, RecordEntry{
+				Metric:    metric,
+				Value:     value,
+				SessionID: *sid,
+				StartedAt: *date,
+			})
+		}
+	}
+
+	add("distance_m", bestDistance, distanceSid, distanceDate)
+	add("duration_s", bestDuration, durationSid, durationDate)
+	if bestSpeed != nil {
+		add("speed_max_kmh", *bestSpeed, speedSid, speedDate)
+	}
+	add("sprints", bestSprints, sprintsSid, sprintsDate)
+	if bestIntensity != nil {
+		add("intensity", *bestIntensity, intensitySid, intensityDate)
+	}
+	if bestRating != nil {
+		add("match_rating", *bestRating, ratingSid, ratingDate)
+	}
+	if bestHRMax != nil {
+		add("hr_max", *bestHRMax, hrMaxSid, hrMaxDate)
+	}
+	if bestCalories != nil {
+		add("calories_kcal", *bestCalories, caloriesSid, caloriesDate)
+	}
+
+	return PersonalRecords{Records: records}, nil
 }
 
 func (s *PostgresStore) loadSamples(ctx context.Context, sessionID string) ([]Sample, error) {

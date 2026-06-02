@@ -126,6 +126,19 @@ type New struct {
 	PitchID      *string
 }
 
+// RecordEntry is a single personal best for one metric.
+type RecordEntry struct {
+	Metric    string    `json:"metric"`
+	Value     float64   `json:"value"`
+	SessionID string    `json:"session_id"`
+	StartedAt time.Time `json:"started_at"`
+}
+
+// PersonalRecords holds all personal bests for a user.
+type PersonalRecords struct {
+	Records []RecordEntry `json:"records"`
+}
+
 // Store persists sport sessions.
 type Store interface {
 	// Create inserts a new session owned by userID and returns the stored row.
@@ -140,6 +153,8 @@ type Store interface {
 	UpdateContext(ctx context.Context, userID, id string, cu ContextUpdate) (Session, error)
 	// Delete removes a session owned by userID.
 	Delete(ctx context.Context, userID, id string) error
+	// GetPersonalRecords returns the user's personal bests per metric.
+	GetPersonalRecords(ctx context.Context, userID string) (PersonalRecords, error)
 }
 
 // Update carries editable aggregate fields (samples are not modified).
