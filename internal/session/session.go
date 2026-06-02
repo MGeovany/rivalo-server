@@ -251,11 +251,12 @@ type BadgeMetrics struct {
 
 // PitchStats aggregates a user's sessions at a single pitch.
 type PitchStats struct {
-	MatchCount   int        `json:"match_count"`
-	AvgRating    *float64   `json:"avg_rating"`
-	AvgDistanceM *float64   `json:"avg_distance_m"`
-	AvgSprints   *float64   `json:"avg_sprints"`
-	LastPlayedAt *time.Time `json:"last_played_at"`
+	MatchCount   int           `json:"match_count"`
+	AvgRating    *float64      `json:"avg_rating"`
+	AvgDistanceM *float64      `json:"avg_distance_m"`
+	AvgSprints   *float64      `json:"avg_sprints"`
+	LastPlayedAt *time.Time    `json:"last_played_at"`
+	Records      []RecordEntry `json:"records"`
 }
 
 // Update carries editable aggregate fields (samples are not modified).

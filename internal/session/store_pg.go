@@ -525,17 +525,91 @@ func (s *PostgresStore) GetStreaks(ctx context.Context, userID string) (Streaks,
 }
 
 func (s *PostgresStore) GetPitchStats(ctx context.Context, userID, pitchID string) (PitchStats, error) {
-	const query = `
+	const aggQuery = `
 		select count(*)::int, avg(match_rating), avg(distance_m), avg(sprints)::float8, max(started_at)
 		from public.sessions
 		where user_id = $1 and pitch_id = $2`
 	var ps PitchStats
-	err := s.pool.QueryRow(ctx, query, userID, pitchID).Scan(
+	err := s.pool.QueryRow(ctx, aggQuery, userID, pitchID).Scan(
 		&ps.MatchCount, &ps.AvgRating, &ps.AvgDistanceM, &ps.AvgSprints, &ps.LastPlayedAt,
 	)
 	if err != nil {
 		return PitchStats{}, err
 	}
+
+	const recordsQuery = `
+		select distance_m, speed_max_kmh, sprints::float8, match_rating::float8,
+		       id, started_at
+		from public.sessions
+		where user_id = $1 and pitch_id = $2`
+	rows, err := s.pool.Query(ctx, recordsQuery, userID, pitchID)
+	if err != nil {
+		return PitchStats{}, err
+	}
+	defer rows.Close()
+
+	var (
+		bestDist     float64
+		distSid      *string
+		distDate     *time.Time
+		bestSpeed    *float64
+		speedSid     *string
+		speedDate    *time.Time
+		bestSprints  float64
+		sprintSid    *string
+		sprintDate   *time.Time
+		bestRating   *float64
+		ratingSid    *string
+		ratingDate   *time.Time
+	)
+	for rows.Next() {
+		var dist float64
+		var speedKMH, sprints, matchRating *float64
+		var id string
+		var startedAt time.Time
+		if err := rows.Scan(&dist, &speedKMH, &sprints, &matchRating, &id, &startedAt); err != nil {
+			return PitchStats{}, err
+		}
+		if dist > bestDist {
+			bestDist = dist
+			distSid = &id
+			distDate = &startedAt
+		}
+		if speedKMH != nil && (bestSpeed == nil || *speedKMH > *bestSpeed) {
+			bestSpeed = speedKMH
+			speedSid = &id
+			speedDate = &startedAt
+		}
+		if sprints != nil && float64(*sprints) > bestSprints {
+			bestSprints = float64(*sprints)
+			sprintSid = &id
+			sprintDate = &startedAt
+		}
+		if matchRating != nil && (bestRating == nil || *matchRating > *bestRating) {
+			bestRating = matchRating
+			ratingSid = &id
+			ratingDate = &startedAt
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return PitchStats{}, err
+	}
+
+	records := make([]RecordEntry, 0, 4)
+	if distSid != nil && distDate != nil {
+		records = append(records, RecordEntry{Metric: "distance_m", Value: bestDist, SessionID: *distSid, StartedAt: *distDate})
+	}
+	if bestSpeed != nil && speedSid != nil && speedDate != nil {
+		records = append(records, RecordEntry{Metric: "speed_max_kmh", Value: *bestSpeed, SessionID: *speedSid, StartedAt: *speedDate})
+	}
+	if sprintSid != nil && sprintDate != nil {
+		records = append(records, RecordEntry{Metric: "sprints", Value: bestSprints, SessionID: *sprintSid, StartedAt: *sprintDate})
+	}
+	if bestRating != nil && ratingSid != nil && ratingDate != nil {
+		records = append(records, RecordEntry{Metric: "match_rating", Value: *bestRating, SessionID: *ratingSid, StartedAt: *ratingDate})
+	}
+	ps.Records = records
+
 	return ps, nil
 }
 

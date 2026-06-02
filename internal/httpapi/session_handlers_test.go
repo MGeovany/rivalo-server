@@ -468,6 +468,16 @@ func (f *fakeSessionStore) GetPitchStats(_ context.Context, userID, pitchID stri
 	var ps session.PitchStats
 	var distSum, sprintsSum, ratingSum float64
 	var ratingN int
+
+	var bestDist float64
+	var bestSpeed *float64
+	var bestSprints float64
+	var bestRating *float64
+	var distSid, sprintSid *string
+	var distDate, sprintDate *time.Time
+	var speedSid, ratingSid *string
+	var speedDate, ratingDate *time.Time
+
 	for _, s := range f.items[userID] {
 		if s.PitchID == nil || *s.PitchID != pitchID {
 			continue
@@ -483,6 +493,28 @@ func (f *fakeSessionStore) GetPitchStats(_ context.Context, userID, pitchID stri
 			t := s.StartedAt
 			ps.LastPlayedAt = &t
 		}
+
+		// Records
+		if s.DistanceM > bestDist {
+			bestDist = s.DistanceM
+			distSid = &s.ID
+			distDate = &s.StartedAt
+		}
+		if s.SpeedMaxKMH != nil && (bestSpeed == nil || *s.SpeedMaxKMH > *bestSpeed) {
+			bestSpeed = s.SpeedMaxKMH
+			speedSid = &s.ID
+			speedDate = &s.StartedAt
+		}
+		if float64(s.Sprints) > bestSprints {
+			bestSprints = float64(s.Sprints)
+			sprintSid = &s.ID
+			sprintDate = &s.StartedAt
+		}
+		if s.MatchRating != nil && (bestRating == nil || *s.MatchRating > *bestRating) {
+			bestRating = s.MatchRating
+			ratingSid = &s.ID
+			ratingDate = &s.StartedAt
+		}
 	}
 	if ps.MatchCount > 0 {
 		n := float64(ps.MatchCount)
@@ -492,6 +524,22 @@ func (f *fakeSessionStore) GetPitchStats(_ context.Context, userID, pitchID stri
 			ps.AvgRating = floatPtr(ratingSum / float64(ratingN))
 		}
 	}
+
+	records := make([]session.RecordEntry, 0, 4)
+	if distSid != nil && distDate != nil {
+		records = append(records, session.RecordEntry{Metric: "distance_m", Value: bestDist, SessionID: *distSid, StartedAt: *distDate})
+	}
+	if bestSpeed != nil && speedSid != nil && speedDate != nil {
+		records = append(records, session.RecordEntry{Metric: "speed_max_kmh", Value: *bestSpeed, SessionID: *speedSid, StartedAt: *speedDate})
+	}
+	if sprintSid != nil && sprintDate != nil {
+		records = append(records, session.RecordEntry{Metric: "sprints", Value: bestSprints, SessionID: *sprintSid, StartedAt: *sprintDate})
+	}
+	if bestRating != nil && ratingSid != nil && ratingDate != nil {
+		records = append(records, session.RecordEntry{Metric: "match_rating", Value: *bestRating, SessionID: *ratingSid, StartedAt: *ratingDate})
+	}
+	ps.Records = records
+
 	return ps, nil
 }
 
