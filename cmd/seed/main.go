@@ -131,7 +131,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	log.Printf("done — profile + %d sessions (dense samples + GPS path) for %s / %s", sessionCount, demoEmail, demoPassword)
+	log.Printf("done — profile + %d pitches + %d sessions (context, GPS heatmap, structured halves) for %s / %s", len(demoPitchIDs), sessionCount, demoEmail, demoPassword)
 }
 
 func ensureAuthUser(ctx context.Context, baseURL, serviceKey, email, password string) (string, error) {
@@ -255,15 +255,55 @@ func seedProfile(ctx context.Context, pool *pgxpool.Pool, userID string) error {
 	return err
 }
 
+func seedPitches(ctx context.Context, tx pgx.Tx, userID string) error {
+	pitches := []demoPitch{
+		{demoPitchIDs[0], "Estadio Central", "11-a-side", "Natural grass", 105, 68, "walk", 0, 0},
+		{demoPitchIDs[1], "Canchas El Norte", "7-a-side", "Artificial turf", 55, 35, "manual", 0.0040, 0.0040},
+		{demoPitchIDs[2], "Polideportivo Sur", "5-a-side", "Indoor", 40, 20, "manual", -0.0030, 0.0020},
+	}
+	const q = `
+		insert into public.pitches (id, user_id, name, latitude, longitude, type, surface, length_m, width_m, measurement_method)
+		values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+		on conflict (id) do update set
+			name = excluded.name, latitude = excluded.latitude, longitude = excluded.longitude,
+			type = excluded.type, surface = excluded.surface, length_m = excluded.length_m,
+			width_m = excluded.width_m, measurement_method = excluded.measurement_method, updated_at = now()`
+	for _, p := range pitches {
+		if _, err := tx.Exec(ctx, q, p.id, userID, p.name,
+			demoBaseLat+p.latOffset, demoBaseLon+p.lonOffset, p.pType, p.surface, p.lengthM, p.widthM, p.measurementMethod,
+		); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func seedSessions(ctx context.Context, pool *pgxpool.Pool, userID string) (int, error) {
-	halftime := 2730
-	rating := 78.5
+	// ~16 weeks of varied matches: modes, surfaces, positions (≥3 in 4 positions
+	// for position insights), match types/tags, full context + opponent, rating
+	// trending up recently, several structured halves, and many sessions sharing
+	// pitch 0 (same-court comparison). Dates have no weekly gap → a live streak.
 	matches := []demoMatch{
-		{demoSessionIDs[0], 0, 35, 82, 8120, 138, 162, 24.2, 7, 68, 620, "quick", "7-a-side", nil, nil},
-		{demoSessionIDs[1], 1, 28, 90, 9050, 145, 171, 25.1, 11, 74, 710, "quick", "7-a-side", nil, nil},
-		{demoSessionIDs[2], 2, 21, 85, 7680, 141, 165, 23.4, 6, 70, 590, "quick", "9-a-side", nil, nil},
-		{demoSessionIDs[3], 3, 14, 88, 8340, 148, 175, 25.8, 10, 76, 655, "structured", "11-a-side", &halftime, ptrFloat(72.0)},
-		{demoSessionIDs[4], 4, 7, 91, 9420, 152, 178, 26.3, 12, 81, 740, "structured", "11-a-side", &halftime, &rating},
+		{1, 92, 10200, 156, 182, 28.5, 16, 86, 790, "structured", "11-a-side", "Natural grass", "Midfielder", "league", "3-1 W", 5, "Los Tigres", 0, true, 90.0},
+		{4, 60, 7600, 150, 176, 25.0, 11, 78, 600, "quick", "7-a-side", "Artificial turf", "Forward", "friendly", "2-2 D", 4, "FC Norte", 1, false, 86.0},
+		{7, 90, 9400, 152, 178, 26.3, 12, 81, 740, "structured", "11-a-side", "Natural grass", "Midfielder", "league", "1-0 W", 5, "Real Sur", 0, true, 88.0},
+		{10, 45, 5200, 144, 170, 23.1, 7, 70, 460, "training", "5-a-side", "Indoor", "Winger", "training", "", 3, "", 2, false, 82.0},
+		{13, 88, 8900, 149, 175, 25.6, 10, 79, 700, "structured", "11-a-side", "Natural grass", "Defender", "league", "0-1 L", 2, "Atlético Centro", 0, true, 80.0},
+		{17, 55, 7100, 147, 172, 24.4, 9, 75, 560, "quick", "7-a-side", "Artificial turf", "Midfielder", "friendly", "4-3 W", 5, "Halcones", 1, false, 84.0},
+		{20, 90, 9100, 151, 177, 25.9, 11, 80, 720, "structured", "9-a-side", "Natural grass", "Forward", "league", "2-1 W", 4, "Deportivo Olancho", 0, true, 83.0},
+		{24, 50, 5600, 142, 168, 22.8, 6, 68, 470, "training", "5-a-side", "Indoor", "Winger", "training", "", 4, "", 2, false, 76.0},
+		{27, 60, 7400, 146, 171, 24.0, 9, 74, 580, "quick", "7-a-side", "Concrete", "Midfielder", "friendly", "1-1 D", 3, "Barrio Unido", 1, false, 75.0},
+		{31, 90, 8700, 148, 174, 25.2, 10, 78, 690, "structured", "11-a-side", "Natural grass", "Defender", "league", "3-0 W", 5, "San Pedro FC", 0, true, 79.0},
+		{34, 45, 5000, 140, 166, 22.0, 5, 66, 440, "training", "5-a-side", "Indoor", "Midfielder", "training", "", 3, "", 2, false, 70.0},
+		{38, 58, 7000, 145, 170, 23.7, 8, 73, 560, "quick", "7-a-side", "Artificial turf", "Forward", "friendly", "0-2 L", 2, "Los Lobos", 1, false, 72.0},
+		{41, 90, 8500, 147, 173, 24.8, 9, 77, 680, "structured", "11-a-side", "Natural grass", "Midfielder", "league", "2-2 D", 3, "Club Atlético", 0, true, 77.0},
+		{45, 52, 5400, 141, 167, 22.5, 6, 67, 450, "training", "5-a-side", "Concrete", "Defender", "training", "", 4, "", 2, false, 68.0},
+		{48, 56, 6800, 144, 169, 23.4, 8, 72, 540, "quick", "9-a-side", "Artificial turf", "Forward", "friendly", "3-3 D", 4, "Tegus FC", 1, false, 74.0},
+		{52, 90, 8300, 146, 172, 24.5, 9, 76, 670, "structured", "11-a-side", "Natural grass", "Midfielder", "league", "1-2 L", 2, "Real Sur", 0, true, 73.0},
+		{56, 48, 5100, 139, 165, 21.8, 5, 65, 430, "training", "5-a-side", "Indoor", "Winger", "training", "", 3, "", 2, false, 66.0},
+		{59, 60, 7200, 145, 170, 23.9, 9, 73, 570, "quick", "7-a-side", "Concrete", "Midfielder", "friendly", "2-0 W", 5, "Halcones", 1, false, 71.0},
+		{63, 88, 8000, 145, 171, 24.0, 8, 75, 650, "structured", "11-a-side", "Natural grass", "Forward", "league", "0-0 D", 3, "Atlético Centro", 0, true, 69.0},
+		{67, 50, 5300, 140, 166, 22.2, 6, 66, 450, "training", "5-a-side", "Indoor", "Defender", "training", "", 3, "", 2, false, 64.0},
 	}
 
 	tx, err := pool.Begin(ctx)
@@ -272,13 +312,23 @@ func seedSessions(ctx context.Context, pool *pgxpool.Pool, userID string) (int, 
 	}
 	defer tx.Rollback(ctx)
 
-	if _, err := tx.Exec(ctx, `delete from public.session_path where session_id = any($1)`, demoSessionIDs[:]); err != nil {
+	ids := make([]string, len(matches))
+	for i := range matches {
+		ids[i] = demoSessionID(i)
+	}
+	if _, err := tx.Exec(ctx, `delete from public.session_path where session_id = any($1)`, ids); err != nil {
 		return 0, err
 	}
-	if _, err := tx.Exec(ctx, `delete from public.session_samples where session_id = any($1)`, demoSessionIDs[:]); err != nil {
+	if _, err := tx.Exec(ctx, `delete from public.session_samples where session_id = any($1)`, ids); err != nil {
 		return 0, err
 	}
-	if _, err := tx.Exec(ctx, `delete from public.sessions where id = any($1)`, demoSessionIDs[:]); err != nil {
+	if _, err := tx.Exec(ctx, `delete from public.sessions where id = any($1)`, ids); err != nil {
+		return 0, err
+	}
+	if _, err := tx.Exec(ctx, `delete from public.pitches where id = any($1)`, demoPitchIDs[:]); err != nil {
+		return 0, err
+	}
+	if err := seedPitches(ctx, tx, userID); err != nil {
 		return 0, err
 	}
 
@@ -286,29 +336,37 @@ func seedSessions(ctx context.Context, pool *pgxpool.Pool, userID string) (int, 
 		insert into public.sessions (
 			id, user_id, started_at, ended_at, duration_s, distance_m,
 			hr_avg, hr_max, speed_max_kmh, sprints, intensity, calories_kcal, source,
-			mode, match_type, halftime_offset_s, match_rating, position, surface, match_tag, feeling
-		) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)`
+			mode, match_type, halftime_offset_s, match_rating, position, surface, match_tag,
+			feeling, result, opponent, pitch_id
+		) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24)`
 
 	now := time.Now().UTC()
-	for _, m := range matches {
+	for i, m := range matches {
+		id := demoSessionID(i)
 		start := now.AddDate(0, 0, -m.daysAgo).Truncate(time.Minute)
 		duration := time.Duration(m.durationMin) * time.Minute
 		end := start.Add(duration)
 		durationS := int(duration.Seconds())
 
+		var halftimeS *int
+		if m.structured {
+			hs := durationS / 2
+			halftimeS = &hs
+		}
+
 		if _, err := tx.Exec(ctx, insertSession,
-			m.id, userID, start, end, durationS, m.distanceM,
+			id, userID, start, end, durationS, m.distanceM,
 			m.hrAvg, m.hrMax, m.speedMax, m.sprints, m.intensity, m.calories, "watch",
-			m.mode, m.matchType, m.halftimeS, m.matchRating,
-			"Midfielder", "Artificial turf", "league", 4,
+			m.mode, m.matchType, halftimeS, ptrFloat(m.rating), m.position, m.surface, m.matchTag,
+			m.feeling, nilIfEmpty(m.result), nilIfEmpty(m.opponent), demoPitchIDs[m.pitchIdx],
 		); err != nil {
 			return 0, err
 		}
 
-		if err := insertSamples(ctx, tx, m, durationS); err != nil {
+		if err := insertSamples(ctx, tx, id, m.hrAvg, m.hrMax, durationS, halftimeS); err != nil {
 			return 0, err
 		}
-		if err := insertPath(ctx, tx, m.id, m.index, durationS); err != nil {
+		if err := insertPath(ctx, tx, id, i, durationS, positionXBias(m.position)); err != nil {
 			return 0, err
 		}
 	}
@@ -319,23 +377,23 @@ func seedSessions(ctx context.Context, pool *pgxpool.Pool, userID string) (int, 
 	return len(matches), nil
 }
 
-func insertSamples(ctx context.Context, tx pgx.Tx, m demoMatch, durationS int) error {
+func insertSamples(ctx context.Context, tx pgx.Tx, sessionID string, hrAvg, hrMax, durationS int, halftimeS *int) error {
 	rows := make([][]any, 0, durationS/10+1)
 	for offset := 0; offset <= durationS; offset += 10 {
-		hr := demoHR(offset, m.hrAvg)
-		if hr > m.hrMax {
-			hr = m.hrMax
+		hr := demoHR(offset, hrAvg)
+		if hr > hrMax {
+			hr = hrMax
 		}
 		speed := demoSpeedKmh(offset, durationS)
 		var half *int
-		if m.halftimeS != nil {
+		if halftimeS != nil {
 			h := 1
-			if offset >= *m.halftimeS {
+			if offset >= *halftimeS {
 				h = 2
 			}
 			half = &h
 		}
-		rows = append(rows, []any{m.id, offset, hr, speed, half})
+		rows = append(rows, []any{sessionID, offset, hr, speed, half})
 	}
 	_, err := tx.CopyFrom(ctx,
 		pgx.Identifier{"public", "session_samples"},
@@ -345,10 +403,10 @@ func insertSamples(ctx context.Context, tx pgx.Tx, m demoMatch, durationS int) e
 	return err
 }
 
-func insertPath(ctx context.Context, tx pgx.Tx, sessionID string, sessionIndex, durationS int) error {
+func insertPath(ctx context.Context, tx pgx.Tx, sessionID string, sessionIndex, durationS int, posBias float64) error {
 	rows := make([][]any, 0, durationS/5+1)
 	for offset := 0; offset <= durationS; offset += 5 {
-		x, y := demoPitchXY(offset, durationS, sessionIndex)
+		x, y := demoPitchXY(offset, durationS, sessionIndex, posBias)
 		lat, lon := pitchToGPS(x, y)
 		rows = append(rows, []any{sessionID, offset, lat, lon})
 	}
@@ -358,6 +416,13 @@ func insertPath(ctx context.Context, tx pgx.Tx, sessionID string, sessionIndex, 
 		pgx.CopyFromRows(rows),
 	)
 	return err
+}
+
+func nilIfEmpty(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
 }
 
 func ptrFloat(v float64) *float64 {

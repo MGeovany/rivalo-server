@@ -12,9 +12,9 @@ const (
 
 // demoPitchXY returns normalized pitch coordinates (0…1) with attack → +X (right).
 // Layout matches the reference heatmap: hot zones bottom-right and center-right.
-func demoPitchXY(tOffsetS, durationS, sessionIndex int) (x, y float64) {
+func demoPitchXY(tOffsetS, durationS, sessionIndex int, posBias float64) (x, y float64) {
 	if durationS <= 0 {
-		return 0.5, 0.5
+		return clamp01(0.5 + posBias), 0.5
 	}
 	progress := float64(tOffsetS) / float64(durationS)
 	t := float64(tOffsetS)
@@ -51,7 +51,7 @@ func demoPitchXY(tOffsetS, durationS, sessionIndex int) (x, y float64) {
 	jitterX := math.Sin(t*0.11)*0.03 + math.Cos(t*0.07)*0.02
 	jitterY := math.Cos(t*0.09)*0.04 + math.Sin(t*0.13)*0.02
 
-	x = clamp01(cx + jitterX)
+	x = clamp01(cx + jitterX + posBias)
 	y = clamp01(cy + jitterY)
 	return x, y
 }
