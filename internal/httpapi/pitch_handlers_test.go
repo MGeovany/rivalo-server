@@ -3,13 +3,15 @@ package httpapi
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"net/http"
+	"strconv"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/MGeovany/rivalo-server/internal/auth"
 	"github.com/MGeovany/rivalo-server/internal/pitch"
+	"github.com/MGeovany/rivalo-server/internal/session"
 )
 
 // fakePitchStore is an in-memory pitch.Store for handler tests.
