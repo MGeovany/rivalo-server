@@ -57,10 +57,11 @@ const (
 	CompetitionFriendly   = "friendly"
 	CompetitionLeague     = "league"
 	CompetitionTournament = "tournament"
+	CompetitionTraining   = "training"
 )
 
 var ValidOutcomes = []string{OutcomeWin, OutcomeDraw, OutcomeLoss}
-var ValidCompetitions = []string{CompetitionFriendly, CompetitionLeague, CompetitionTournament}
+var ValidCompetitions = []string{CompetitionFriendly, CompetitionLeague, CompetitionTournament, CompetitionTraining}
 
 var ValidMatchTypes = []string{MatchType5aside, MatchType7aside, MatchType9aside, MatchType11aside, MatchTypeOther}
 var ValidSurfaces = []string{SurfaceNaturalGrass, SurfaceArtificialTurf, SurfaceIndoor, SurfaceConcrete, SurfaceOther}

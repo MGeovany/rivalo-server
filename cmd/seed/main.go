@@ -495,6 +495,8 @@ func deriveCompetition(matchTag string, index int) string {
 			return "tournament"
 		}
 		return "league"
+	case "training":
+		return "training"
 	default:
 		return ""
 	}
