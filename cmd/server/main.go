@@ -19,6 +19,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -66,7 +67,7 @@ func run() error {
 		logger.Warn("database_disabled")
 	}
 
-	verifier := auth.NewVerifier(cfg.SupabaseJWTSecret)
+	verifier := buildVerifier(cfg)
 	logger.Info("auth_ready", slog.Bool("configured", verifier.Configured()))
 
 	srv := &http.Server{
@@ -99,4 +100,21 @@ func run() error {
 	}
 	logger.Info("server_stopped")
 	return <-shutdownErr
+}
+
+// buildVerifier picks the JWT verification strategy from config: the project's
+// JWKS (asymmetric ES256, preferred) when SUPABASE_URL is set, otherwise the
+// legacy HS256 shared secret. A failure to load the JWKS leaves the verifier
+// unconfigured so the rest of the API still serves.
+func buildVerifier(cfg config.Config) auth.Verifier {
+	if cfg.SupabaseURL != "" {
+		jwksURL := strings.TrimRight(cfg.SupabaseURL, "/") + "/auth/v1/.well-known/jwks.json"
+		verifier, err := auth.NewJWKSVerifier(jwksURL)
+		if err != nil {
+			logger.Error("auth_jwks_failed", logger.SafeErr(err))
+			return auth.Verifier{}
+		}
+		return verifier
+	}
+	return auth.NewVerifier(cfg.SupabaseJWTSecret)
 }

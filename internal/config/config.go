@@ -15,8 +15,11 @@ type Config struct {
 	// local development: when empty, database-backed features are disabled and
 	// the server still serves stateless endpoints such as /health.
 	DatabaseURL string
-	// SupabaseJWTSecret is the secret used to validate Supabase Auth JWTs.
-	// Optional until authenticated endpoints are wired up.
+	// SupabaseURL is the base URL of the Supabase project. When set, JWTs are
+	// validated against the project's JWKS (asymmetric ES256 signing keys).
+	SupabaseURL string
+	// SupabaseJWTSecret is the legacy shared secret for HS256 JWT validation.
+	// Used as a fallback when SupabaseURL is not set.
 	SupabaseJWTSecret string
 }
 
@@ -30,6 +33,7 @@ func Load() Config {
 	return Config{
 		Port:              getenv("PORT", "8080"),
 		DatabaseURL:       os.Getenv("DATABASE_URL"),
+		SupabaseURL:       os.Getenv("SUPABASE_URL"),
 		SupabaseJWTSecret: os.Getenv("SUPABASE_JWT_SECRET"),
 	}
 }

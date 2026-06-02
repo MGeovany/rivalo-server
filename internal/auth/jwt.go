@@ -5,46 +5,68 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/MicahParks/keyfunc/v3"
 	"github.com/golang-jwt/jwt/v5"
 )
 
 // ErrNotConfigured is returned when token verification is attempted without a
-// configured signing secret.
-var ErrNotConfigured = errors.New("auth: jwt secret not configured")
+// configured key source.
+var ErrNotConfigured = errors.New("auth: jwt verification not configured")
 
-// Verifier validates HS256-signed Supabase JWTs using the project's JWT secret.
+// Verifier validates Supabase Auth JWTs and extracts their subject claim.
+//
+// Supabase signs access tokens with asymmetric keys (ES256) by default, so the
+// production verifier validates against the project's JSON Web Key Set. A
+// symmetric (HS256) verifier is also provided for tests and legacy projects.
 type Verifier struct {
-	secret []byte
+	keyFunc jwt.Keyfunc
+	methods []string
 }
 
-// NewVerifier builds a Verifier from the Supabase JWT secret. An empty secret
-// yields a verifier that rejects every token with ErrNotConfigured.
+// NewVerifier builds an HS256 verifier from a shared secret. An empty secret
+// yields an unconfigured verifier that rejects every token.
 func NewVerifier(secret string) Verifier {
-	return Verifier{secret: []byte(secret)}
+	if secret == "" {
+		return Verifier{}
+	}
+	return Verifier{
+		keyFunc: func(t *jwt.Token) (any, error) {
+			if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+				return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
+			}
+			return []byte(secret), nil
+		},
+		methods: []string{"HS256"},
+	}
 }
 
-// Configured reports whether a signing secret is present.
+// NewJWKSVerifier builds a verifier that validates asymmetric tokens (ES256/
+// RS256) against the JSON Web Key Set fetched from jwksURL. Keys are cached and
+// refreshed in the background to handle rotation.
+func NewJWKSVerifier(jwksURL string) (Verifier, error) {
+	jwks, err := keyfunc.NewDefault([]string{jwksURL})
+	if err != nil {
+		return Verifier{}, fmt.Errorf("load jwks: %w", err)
+	}
+	return Verifier{
+		keyFunc: jwks.Keyfunc,
+		methods: []string{"ES256", "RS256"},
+	}, nil
+}
+
+// Configured reports whether a key source is present.
 func (v Verifier) Configured() bool {
-	return len(v.secret) > 0
+	return v.keyFunc != nil
 }
 
 // Verify checks the token's signature and expiry and returns its subject claim
 // (the Supabase auth user id).
 func (v Verifier) Verify(tokenString string) (string, error) {
-	if !v.Configured() {
+	if v.keyFunc == nil {
 		return "", ErrNotConfigured
 	}
 
-	token, err := jwt.Parse(
-		tokenString,
-		func(t *jwt.Token) (any, error) {
-			if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
-				return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
-			}
-			return v.secret, nil
-		},
-		jwt.WithValidMethods([]string{"HS256"}),
-	)
+	token, err := jwt.Parse(tokenString, v.keyFunc, jwt.WithValidMethods(v.methods))
 	if err != nil {
 		return "", err
 	}
