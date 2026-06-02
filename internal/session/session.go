@@ -64,6 +64,13 @@ type Sample struct {
 	Half     *int     `json:"half,omitempty"`
 }
 
+// PathPoint is one GPS sample on the pitch trajectory (V2 session_path).
+type PathPoint struct {
+	TOffsetS  int     `json:"t_offset_s"`
+	Latitude  float64 `json:"latitude"`
+	Longitude float64 `json:"longitude"`
+}
+
 // Session is a recorded sport session with its aggregate metrics.
 type Session struct {
 	ID           string    `json:"id"`
@@ -93,6 +100,8 @@ type Session struct {
 	CreatedAt     time.Time `json:"created_at"`
 	// Samples is the time series, populated on detail reads (Get); nil on List.
 	Samples []Sample `json:"samples,omitempty"`
+	// Path is the GPS trajectory, populated on detail reads (Get); nil on List.
+	Path []PathPoint `json:"path,omitempty"`
 	// FatigueDrop is computed on-read for structured sessions; nil otherwise.
 	FatigueDrop *FatigueDrop `json:"fatigue_drop,omitempty"`
 }

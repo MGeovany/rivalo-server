@@ -112,6 +112,11 @@ func (s *PostgresStore) Get(ctx context.Context, userID, id string) (Session, er
 		return Session{}, err
 	}
 	sess.Samples = samples
+	path, err := s.loadPath(ctx, sess.ID)
+	if err != nil {
+		return Session{}, err
+	}
+	sess.Path = path
 	return sess, nil
 }
 
@@ -140,6 +145,11 @@ func (s *PostgresStore) Update(ctx context.Context, userID, id string, u Update)
 		return Session{}, err
 	}
 	sess.Samples = samples
+	path, err := s.loadPath(ctx, sess.ID)
+	if err != nil {
+		return Session{}, err
+	}
+	sess.Path = path
 	return sess, nil
 }
 
@@ -167,6 +177,11 @@ func (s *PostgresStore) UpdateContext(ctx context.Context, userID, id string, cu
 		return Session{}, err
 	}
 	sess.Samples = samples
+	path, err := s.loadPath(ctx, sess.ID)
+	if err != nil {
+		return Session{}, err
+	}
+	sess.Path = path
 	return sess, nil
 }
 
@@ -204,6 +219,30 @@ func (s *PostgresStore) loadSamples(ctx context.Context, sessionID string) ([]Sa
 		samples = append(samples, smp)
 	}
 	return samples, rows.Err()
+}
+
+func (s *PostgresStore) loadPath(ctx context.Context, sessionID string) ([]PathPoint, error) {
+	const query = `
+		select t_offset_s, latitude, longitude
+		from public.session_path
+		where session_id = $1
+		order by t_offset_s`
+
+	rows, err := s.pool.Query(ctx, query, sessionID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	path := make([]PathPoint, 0)
+	for rows.Next() {
+		var pt PathPoint
+		if err := rows.Scan(&pt.TOffsetS, &pt.Latitude, &pt.Longitude); err != nil {
+			return nil, err
+		}
+		path = append(path, pt)
+	}
+	return path, rows.Err()
 }
 
 // scanRow is satisfied by both pgx.Row and pgx.Rows.
