@@ -737,6 +737,56 @@ func TestCreateSession_Path_InvalidLatitude_400(t *testing.T) {
 	}
 }
 
+func createForRecords(t *testing.T, store *fakeSessionStore, token string, distance float64, sprints, durationS int) session.Session {
+	t.Helper()
+	body := validSessionBody()
+	body.DistanceM = distance
+	body.Sprints = sprints
+	body.DurationS = durationS
+	body.EndedAt = body.StartedAt.Add(time.Duration(durationS) * time.Second)
+	rec := doRequest(t, sessionDeps(store), http.MethodPost, "/v1/sessions", "Bearer "+token, body)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("create status = %d, want 201; body = %s", rec.Code, rec.Body.String())
+	}
+	var created session.Session
+	if err := json.NewDecoder(rec.Body).Decode(&created); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	return created
+}
+
+func TestCreateSession_FirstSession_NoNewRecords(t *testing.T) {
+	store := newFakeSessionStore()
+	token := signToken(t, testSecret, "user-1", time.Now().Add(time.Hour))
+	created := createForRecords(t, store, token, 5000, 5, 3000)
+	if len(created.NewRecords) != 0 {
+		t.Fatalf("first session should not break records, got %v", created.NewRecords)
+	}
+}
+
+func TestCreateSession_BeatsDistance_FlagsNewRecord(t *testing.T) {
+	store := newFakeSessionStore()
+	token := signToken(t, testSecret, "user-1", time.Now().Add(time.Hour))
+	_ = createForRecords(t, store, token, 5000, 5, 3000)
+	beater := createForRecords(t, store, token, 9000, 20, 5400)
+	if !contains(beater.NewRecords, "distance_m") {
+		t.Fatalf("expected distance_m in new_records, got %v", beater.NewRecords)
+	}
+	if !contains(beater.NewRecords, "sprints") {
+		t.Fatalf("expected sprints in new_records, got %v", beater.NewRecords)
+	}
+}
+
+func TestCreateSession_DoesNotBeat_NoNewRecords(t *testing.T) {
+	store := newFakeSessionStore()
+	token := signToken(t, testSecret, "user-1", time.Now().Add(time.Hour))
+	_ = createForRecords(t, store, token, 9000, 20, 5400)
+	weak := createForRecords(t, store, token, 3000, 1, 2000)
+	if len(weak.NewRecords) != 0 {
+		t.Fatalf("weaker session should break no records, got %v", weak.NewRecords)
+	}
+}
+
 func TestGetSession_FatigueDrop_Structured(t *testing.T) {
 	store := newFakeSessionStore()
 	token := signToken(t, testSecret, "user-1", time.Now().Add(time.Hour))
