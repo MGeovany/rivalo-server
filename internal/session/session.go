@@ -139,6 +139,42 @@ type PersonalRecords struct {
 	Records []RecordEntry `json:"records"`
 }
 
+// ContextGroup holds aggregated stats for one context value (e.g. "11-a-side").
+type ContextGroup struct {
+	Value         string   `json:"value"`
+	Count         int      `json:"count"`
+	AvgMatchRating *float64 `json:"avg_match_rating"`
+	AvgDistance   *float64 `json:"avg_distance"`
+	AvgDurationS  *float64 `json:"avg_duration_s"`
+	AvgIntensity  *float64 `json:"avg_intensity"`
+}
+
+// StatsTotals holds aggregate totals across all sessions.
+type StatsTotals struct {
+	SessionCount    int     `json:"session_count"`
+	TotalDistanceM  float64 `json:"total_distance_m"`
+	TotalDurationS  int     `json:"total_duration_s"`
+	TotalCalories   *float64 `json:"total_calories"`
+}
+
+// StatsAverages holds per-match averages.
+type StatsAverages struct {
+	DistancePerMatch *float64 `json:"distance_per_match"`
+	DurationPerMatch *float64 `json:"duration_per_match"`
+	SprintsPerMatch  *float64 `json:"sprints_per_match"`
+	Intensity        *float64 `json:"intensity"`
+	MatchRating      *float64 `json:"match_rating"`
+}
+
+// SessionInsights holds aggregated stats and per-context breakdowns.
+type SessionInsights struct {
+	Totals    StatsTotals              `json:"totals"`
+	Averages  StatsAverages            `json:"averages"`
+	ByMatchType []ContextGroup         `json:"by_match_type"`
+	BySurface   []ContextGroup         `json:"by_surface"`
+	ByPosition  []ContextGroup         `json:"by_position"`
+}
+
 // Store persists sport sessions.
 type Store interface {
 	// Create inserts a new session owned by userID and returns the stored row.
@@ -155,6 +191,8 @@ type Store interface {
 	Delete(ctx context.Context, userID, id string) error
 	// GetPersonalRecords returns the user's personal bests per metric.
 	GetPersonalRecords(ctx context.Context, userID string) (PersonalRecords, error)
+	// GetInsights returns aggregated stats and per-context breakdowns.
+	GetInsights(ctx context.Context, userID string) (SessionInsights, error)
 }
 
 // Update carries editable aggregate fields (samples are not modified).

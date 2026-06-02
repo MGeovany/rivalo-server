@@ -223,6 +223,114 @@ func (f *fakeSessionStore) GetPersonalRecords(_ context.Context, userID string) 
 	return session.PersonalRecords{Records: records}, nil
 }
 
+func (f *fakeSessionStore) GetInsights(_ context.Context, userID string) (session.SessionInsights, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	list := f.items[userID]
+	if len(list) == 0 {
+		return session.SessionInsights{}, nil
+	}
+
+	var ins session.SessionInsights
+	ins.Totals.SessionCount = len(list)
+
+	var distSum, durSum, sprintsSum, intSum, ratingSum float64
+	var intCount, ratingCount, calsSum int
+	for _, s := range list {
+		ins.Totals.TotalDistanceM += s.DistanceM
+		ins.Totals.TotalDurationS += s.DurationS
+		distSum += s.DistanceM
+		durSum += float64(s.DurationS)
+		sprintsSum += float64(s.Sprints)
+		if s.Intensity != nil {
+			intSum += *s.Intensity
+			intCount++
+		}
+		if s.MatchRating != nil {
+			ratingSum += *s.MatchRating
+			ratingCount++
+		}
+		if s.CaloriesKcal != nil {
+			calsSum++
+			ins.Totals.TotalCalories = floatPtr(float64(calsSum))
+		}
+	}
+
+	n := float64(len(list))
+	ins.Averages.DistancePerMatch = floatPtr(distSum / n)
+	ins.Averages.DurationPerMatch = floatPtr(durSum / n)
+	ins.Averages.SprintsPerMatch = floatPtr(sprintsSum / n)
+	if intCount > 0 {
+		ins.Averages.Intensity = floatPtr(intSum / float64(intCount))
+	}
+	if ratingCount > 0 {
+		ins.Averages.MatchRating = floatPtr(ratingSum / float64(ratingCount))
+	}
+
+	ctxGroup := func(field string) []session.ContextGroup {
+		type accum struct {
+			count                                       int
+			ratingSum, distanceSum, durationSum, intSum float64
+			ratingN, intN                               int
+		}
+		m := map[string]*accum{}
+		for _, s := range list {
+			var val string
+			switch field {
+			case "match_type":
+				if s.MatchType != nil {
+					val = *s.MatchType
+				}
+			case "surface":
+				if s.Surface != nil {
+					val = *s.Surface
+				}
+			case "position":
+				if s.Position != nil {
+					val = *s.Position
+				}
+			}
+			if val == "" {
+				continue
+			}
+			if m[val] == nil {
+				m[val] = &accum{}
+			}
+			a := m[val]
+			a.count++
+			a.distanceSum += s.DistanceM
+			a.durationSum += float64(s.DurationS)
+			if s.MatchRating != nil {
+				a.ratingSum += *s.MatchRating
+				a.ratingN++
+			}
+			if s.Intensity != nil {
+				a.intSum += *s.Intensity
+				a.intN++
+			}
+		}
+		var groups []session.ContextGroup
+		for val, a := range m {
+			g := session.ContextGroup{Value: val, Count: a.count}
+			g.AvgDistance = float64Ptr(a.distanceSum / float64(a.count))
+			g.AvgDurationS = float64Ptr(a.durationSum / float64(a.count))
+			if a.ratingN > 0 {
+				g.AvgMatchRating = float64Ptr(a.ratingSum / float64(a.ratingN))
+			}
+			if a.intN > 0 {
+				g.AvgIntensity = float64Ptr(a.intSum / float64(a.intN))
+			}
+			groups = append(groups, g)
+		}
+		return groups
+	}
+
+	ins.ByMatchType = ctxGroup("match_type")
+	ins.BySurface = ctxGroup("surface")
+	ins.ByPosition = ctxGroup("position")
+	return ins, nil
+}
+
 func (f *fakeSessionStore) Delete(_ context.Context, userID, id string) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -713,4 +821,5 @@ func TestCreateSession_MatchRating_Computed(t *testing.T) {
 	if *created.MatchRating < 0 || *created.MatchRating > 100 {
 		t.Errorf("match_rating out of 0–100 range: %f", *created.MatchRating)
 	}
+}
 }

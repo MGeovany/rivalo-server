@@ -311,6 +311,81 @@ func (s *PostgresStore) GetPersonalRecords(ctx context.Context, userID string) (
 	return PersonalRecords{Records: records}, nil
 }
 
+func (s *PostgresStore) GetInsights(ctx context.Context, userID string) (SessionInsights, error) {
+	const totalsQuery = `
+		select
+			count(*)::int,
+			coalesce(sum(distance_m), 0),
+			coalesce(sum(duration_s), 0)::int,
+			sum(calories_kcal)
+		from public.sessions
+		where user_id = $1`
+	const averagesQuery = `
+		select
+			avg(distance_m),
+			avg(duration_s)::float8,
+			avg(sprints)::float8,
+			avg(intensity),
+			avg(match_rating)
+		from public.sessions
+		where user_id = $1`
+
+	ctxGroup := func(field string) ([]ContextGroup, error) {
+		q := `select ` + field + ` as val,
+			count(*)::int,
+			avg(match_rating),
+			avg(distance_m),
+			avg(duration_s)::float8,
+			avg(intensity)
+		from public.sessions
+		where user_id = $1 and ` + field + ` is not null
+		group by ` + field + `
+		order by count(*) desc`
+		rows, err := s.pool.Query(ctx, q, userID)
+		if err != nil {
+			return nil, err
+		}
+		defer rows.Close()
+		var groups []ContextGroup
+		for rows.Next() {
+			var g ContextGroup
+			if err := rows.Scan(&g.Value, &g.Count, &g.AvgMatchRating, &g.AvgDistance, &g.AvgDurationS, &g.AvgIntensity); err != nil {
+				return nil, err
+			}
+			groups = append(groups, g)
+		}
+		return groups, rows.Err()
+	}
+
+	var ins SessionInsights
+	if err := s.pool.QueryRow(ctx, totalsQuery, userID).Scan(
+		&ins.Totals.SessionCount, &ins.Totals.TotalDistanceM, &ins.Totals.TotalDurationS, &ins.Totals.TotalCalories,
+	); err != nil {
+		return SessionInsights{}, err
+	}
+	if err := s.pool.QueryRow(ctx, averagesQuery, userID).Scan(
+		&ins.Averages.DistancePerMatch, &ins.Averages.DurationPerMatch,
+		&ins.Averages.SprintsPerMatch, &ins.Averages.Intensity, &ins.Averages.MatchRating,
+	); err != nil {
+		return SessionInsights{}, err
+	}
+
+	var err error
+	ins.ByMatchType, err = ctxGroup("match_type")
+	if err != nil {
+		return SessionInsights{}, err
+	}
+	ins.BySurface, err = ctxGroup("surface")
+	if err != nil {
+		return SessionInsights{}, err
+	}
+	ins.ByPosition, err = ctxGroup("position")
+	if err != nil {
+		return SessionInsights{}, err
+	}
+	return ins, nil
+}
+
 func (s *PostgresStore) loadSamples(ctx context.Context, sessionID string) ([]Sample, error) {
 	const query = `
 		select t_offset_s, hr, speed_kmh, half
