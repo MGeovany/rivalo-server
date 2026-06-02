@@ -17,6 +17,13 @@ const (
 	SourceWatch  = "watch"
 )
 
+// Sample is one point in a session's time series.
+type Sample struct {
+	TOffsetS int      `json:"t_offset_s"`
+	HR       *int     `json:"hr"`
+	SpeedKMH *float64 `json:"speed_kmh"`
+}
+
 // Session is a recorded sport session with its aggregate metrics.
 type Session struct {
 	ID           string    `json:"id"`
@@ -33,6 +40,8 @@ type Session struct {
 	CaloriesKcal *float64  `json:"calories_kcal"`
 	Source       string    `json:"source"`
 	CreatedAt    time.Time `json:"created_at"`
+	// Samples is the time series, populated on detail reads (Get); nil on List.
+	Samples []Sample `json:"samples,omitempty"`
 }
 
 // New carries the fields needed to create a session.
@@ -48,6 +57,7 @@ type New struct {
 	Intensity    *float64
 	CaloriesKcal *float64
 	Source       string
+	Samples      []Sample
 }
 
 // Store persists sport sessions.
