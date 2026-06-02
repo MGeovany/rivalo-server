@@ -11,7 +11,7 @@ var ErrNotFound = errors.New("pitch not found")
 
 var ValidTypes = []string{"5-a-side", "7-a-side", "9-a-side", "11-a-side", "Other"}
 var ValidSurfaces = []string{"Natural grass", "Artificial turf", "Indoor", "Concrete", "Other"}
-var ValidMeasurementMethods = []string{"walk", "camera", "manual"}
+var ValidMeasurementMethods = []string{"walk", "manual"}
 
 // Pitch is a saved pitch owned by a user.
 type Pitch struct {
