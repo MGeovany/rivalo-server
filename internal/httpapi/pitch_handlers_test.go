@@ -186,6 +186,90 @@ func TestCreatePitch_DetailFields_RoundTrip(t *testing.T) {
 	}
 }
 
+func TestGetPitchStats_WithSessions(t *testing.T) {
+	ps := newFakePitchStore()
+	ss := newFakeSessionStore()
+	d := Deps{Sessions: ss, Pitches: ps, Verifier: auth.NewVerifier(testSecret)}
+	token := signToken(t, testSecret, "user-1", time.Now().Add(time.Hour))
+
+	createRec := doRequest(t, d, http.MethodPost, "/v1/pitches", "Bearer "+token, validPitchBody())
+	var court pitch.Pitch
+	_ = json.NewDecoder(createRec.Body).Decode(&court)
+
+	// Two sessions at this court: distances 8000 & 6000, sprints 10 & 20.
+	for _, cfg := range []struct {
+		dist    float64
+		sprints int
+	}{{8000, 10}, {6000, 20}} {
+		body := validSessionBody()
+		body.DistanceM = cfg.dist
+		body.Sprints = cfg.sprints
+		body.PitchID = &court.ID
+		if rec := doRequest(t, d, http.MethodPost, "/v1/sessions", "Bearer "+token, body); rec.Code != http.StatusCreated {
+			t.Fatalf("create session status = %d", rec.Code)
+		}
+	}
+
+	rec := doRequest(t, d, http.MethodGet, "/v1/pitches/"+court.ID+"/stats", "Bearer "+token, nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200; body = %s", rec.Code, rec.Body.String())
+	}
+	var stats session.PitchStats
+	if err := json.NewDecoder(rec.Body).Decode(&stats); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if stats.MatchCount != 2 {
+		t.Fatalf("match_count = %d, want 2", stats.MatchCount)
+	}
+	if stats.AvgDistanceM == nil || *stats.AvgDistanceM != 7000 {
+		t.Errorf("avg_distance_m = %v, want 7000", stats.AvgDistanceM)
+	}
+	if stats.AvgSprints == nil || *stats.AvgSprints != 15 {
+		t.Errorf("avg_sprints = %v, want 15", stats.AvgSprints)
+	}
+	if stats.LastPlayedAt == nil {
+		t.Error("last_played_at should be set")
+	}
+}
+
+func TestGetPitchStats_NoSessions_Empty(t *testing.T) {
+	ps := newFakePitchStore()
+	ss := newFakeSessionStore()
+	d := Deps{Sessions: ss, Pitches: ps, Verifier: auth.NewVerifier(testSecret)}
+	token := signToken(t, testSecret, "user-1", time.Now().Add(time.Hour))
+
+	createRec := doRequest(t, d, http.MethodPost, "/v1/pitches", "Bearer "+token, validPitchBody())
+	var court pitch.Pitch
+	_ = json.NewDecoder(createRec.Body).Decode(&court)
+
+	rec := doRequest(t, d, http.MethodGet, "/v1/pitches/"+court.ID+"/stats", "Bearer "+token, nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+	var stats session.PitchStats
+	_ = json.NewDecoder(rec.Body).Decode(&stats)
+	if stats.MatchCount != 0 || stats.AvgDistanceM != nil || stats.LastPlayedAt != nil {
+		t.Fatalf("expected empty stats, got %+v", stats)
+	}
+}
+
+func TestGetPitchStats_NotOwner_404(t *testing.T) {
+	ps := newFakePitchStore()
+	ss := newFakeSessionStore()
+	d := Deps{Sessions: ss, Pitches: ps, Verifier: auth.NewVerifier(testSecret)}
+	ownerToken := signToken(t, testSecret, "owner", time.Now().Add(time.Hour))
+	otherToken := signToken(t, testSecret, "intruder", time.Now().Add(time.Hour))
+
+	createRec := doRequest(t, d, http.MethodPost, "/v1/pitches", "Bearer "+ownerToken, validPitchBody())
+	var court pitch.Pitch
+	_ = json.NewDecoder(createRec.Body).Decode(&court)
+
+	rec := doRequest(t, d, http.MethodGet, "/v1/pitches/"+court.ID+"/stats", "Bearer "+otherToken, nil)
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, want 404", rec.Code)
+	}
+}
+
 func TestCreatePitch_NoName_400(t *testing.T) {
 	token := signToken(t, testSecret, "user-1", time.Now().Add(time.Hour))
 	body := createPitchRequest{Name: ""}

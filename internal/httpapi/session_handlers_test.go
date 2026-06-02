@@ -410,6 +410,39 @@ func (f *fakeSessionStore) GetStreaks(_ context.Context, userID string) (session
 	return session.BuildStreaks(list, time.Now().UTC()), nil
 }
 
+func (f *fakeSessionStore) GetPitchStats(_ context.Context, userID, pitchID string) (session.PitchStats, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	var ps session.PitchStats
+	var distSum, sprintsSum, ratingSum float64
+	var ratingN int
+	for _, s := range f.items[userID] {
+		if s.PitchID == nil || *s.PitchID != pitchID {
+			continue
+		}
+		ps.MatchCount++
+		distSum += s.DistanceM
+		sprintsSum += float64(s.Sprints)
+		if s.MatchRating != nil {
+			ratingSum += *s.MatchRating
+			ratingN++
+		}
+		if ps.LastPlayedAt == nil || s.StartedAt.After(*ps.LastPlayedAt) {
+			t := s.StartedAt
+			ps.LastPlayedAt = &t
+		}
+	}
+	if ps.MatchCount > 0 {
+		n := float64(ps.MatchCount)
+		ps.AvgDistanceM = floatPtr(distSum / n)
+		ps.AvgSprints = floatPtr(sprintsSum / n)
+		if ratingN > 0 {
+			ps.AvgRating = floatPtr(ratingSum / float64(ratingN))
+		}
+	}
+	return ps, nil
+}
+
 func (f *fakeSessionStore) Delete(_ context.Context, userID, id string) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()

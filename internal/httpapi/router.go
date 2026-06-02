@@ -38,6 +38,7 @@ func NewRouter(d Deps) http.Handler {
 	mux.HandleFunc("POST /v1/pitches", d.requireAuth(d.handleCreatePitch))
 	mux.HandleFunc("GET /v1/pitches", d.requireAuth(d.handleListPitches))
 	mux.HandleFunc("GET /v1/pitches/{id}", d.requireAuth(d.handleGetPitch))
+	mux.HandleFunc("GET /v1/pitches/{id}/stats", d.requireAuth(d.handleGetPitchStats))
 	mux.HandleFunc("PUT /v1/pitches/{id}", d.requireAuth(d.handleUpdatePitch))
 	mux.HandleFunc("DELETE /v1/pitches/{id}", d.requireAuth(d.handleDeletePitch))
 

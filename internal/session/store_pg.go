@@ -524,6 +524,21 @@ func (s *PostgresStore) GetStreaks(ctx context.Context, userID string) (Streaks,
 	return BuildStreaks(list, time.Now().UTC()), nil
 }
 
+func (s *PostgresStore) GetPitchStats(ctx context.Context, userID, pitchID string) (PitchStats, error) {
+	const query = `
+		select count(*)::int, avg(match_rating), avg(distance_m), avg(sprints)::float8, max(started_at)
+		from public.sessions
+		where user_id = $1 and pitch_id = $2`
+	var ps PitchStats
+	err := s.pool.QueryRow(ctx, query, userID, pitchID).Scan(
+		&ps.MatchCount, &ps.AvgRating, &ps.AvgDistanceM, &ps.AvgSprints, &ps.LastPlayedAt,
+	)
+	if err != nil {
+		return PitchStats{}, err
+	}
+	return ps, nil
+}
+
 func (s *PostgresStore) loadSamples(ctx context.Context, sessionID string) ([]Sample, error) {
 	const query = `
 		select t_offset_s, hr, speed_kmh, half

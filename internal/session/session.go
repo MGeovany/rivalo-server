@@ -230,6 +230,17 @@ type Store interface {
 	GetPositionInsights(ctx context.Context, userID string) (PositionInsights, error)
 	// GetStreaks returns the weekly streak and special performance streaks.
 	GetStreaks(ctx context.Context, userID string) (Streaks, error)
+	// GetPitchStats aggregates the user's sessions played at one pitch.
+	GetPitchStats(ctx context.Context, userID, pitchID string) (PitchStats, error)
+}
+
+// PitchStats aggregates a user's sessions at a single pitch.
+type PitchStats struct {
+	MatchCount   int        `json:"match_count"`
+	AvgRating    *float64   `json:"avg_rating"`
+	AvgDistanceM *float64   `json:"avg_distance_m"`
+	AvgSprints   *float64   `json:"avg_sprints"`
+	LastPlayedAt *time.Time `json:"last_played_at"`
 }
 
 // Update carries editable aggregate fields (samples are not modified).
