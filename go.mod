@@ -4,6 +4,7 @@ go 1.26.3
 
 require (
 	github.com/MicahParks/keyfunc/v3 v3.8.0
+	github.com/aws/aws-lambda-go v1.54.0
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/jackc/pgx/v5 v5.9.2
 	github.com/joho/godotenv v1.5.1
