@@ -29,10 +29,40 @@ func (s *PostgresStore) Create(ctx context.Context, userID string, n New) (Sessi
 		values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 		returning ` + sessionColumns
 
-	return scanSession(s.pool.QueryRow(ctx, query,
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return Session{}, err
+	}
+	defer tx.Rollback(ctx)
+
+	sess, err := scanSession(tx.QueryRow(ctx, query,
 		userID, n.StartedAt, n.EndedAt, n.DurationS, n.DistanceM,
 		n.HRAvg, n.HRMax, n.SpeedMaxKMH, n.Sprints, n.Intensity, n.CaloriesKcal, n.Source,
 	))
+	if err != nil {
+		return Session{}, err
+	}
+
+	if len(n.Samples) > 0 {
+		rows := make([][]any, len(n.Samples))
+		for i, smp := range n.Samples {
+			rows[i] = []any{sess.ID, smp.TOffsetS, smp.HR, smp.SpeedKMH}
+		}
+		_, err = tx.CopyFrom(ctx,
+			pgx.Identifier{"public", "session_samples"},
+			[]string{"session_id", "t_offset_s", "hr", "speed_kmh"},
+			pgx.CopyFromRows(rows),
+		)
+		if err != nil {
+			return Session{}, err
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return Session{}, err
+	}
+	sess.Samples = n.Samples
+	return sess, nil
 }
 
 func (s *PostgresStore) List(ctx context.Context, userID string) ([]Session, error) {
@@ -69,7 +99,40 @@ func (s *PostgresStore) Get(ctx context.Context, userID, id string) (Session, er
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Session{}, ErrNotFound
 	}
-	return sess, err
+	if err != nil {
+		return Session{}, err
+	}
+
+	samples, err := s.loadSamples(ctx, sess.ID)
+	if err != nil {
+		return Session{}, err
+	}
+	sess.Samples = samples
+	return sess, nil
+}
+
+func (s *PostgresStore) loadSamples(ctx context.Context, sessionID string) ([]Sample, error) {
+	const query = `
+		select t_offset_s, hr, speed_kmh
+		from public.session_samples
+		where session_id = $1
+		order by t_offset_s`
+
+	rows, err := s.pool.Query(ctx, query, sessionID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	samples := make([]Sample, 0)
+	for rows.Next() {
+		var smp Sample
+		if err := rows.Scan(&smp.TOffsetS, &smp.HR, &smp.SpeedKMH); err != nil {
+			return nil, err
+		}
+		samples = append(samples, smp)
+	}
+	return samples, rows.Err()
 }
 
 // scanRow is satisfied by both pgx.Row and pgx.Rows.

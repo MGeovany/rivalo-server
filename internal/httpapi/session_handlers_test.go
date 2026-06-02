@@ -43,6 +43,7 @@ func (f *fakeSessionStore) Create(_ context.Context, userID string, n session.Ne
 		Intensity:    n.Intensity,
 		CaloriesKcal: n.CaloriesKcal,
 		Source:       n.Source,
+		Samples:      n.Samples,
 		CreatedAt:    n.StartedAt,
 	}
 	f.items[userID] = append(f.items[userID], s)
@@ -112,6 +113,38 @@ func TestCreateSession_OversizedBody_400(t *testing.T) {
 	rec := doRequest(t, sessionDeps(newFakeSessionStore()), http.MethodPost, "/v1/sessions", "Bearer "+token, body)
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want 400 (oversized body must be rejected)", rec.Code)
+	}
+}
+
+func TestSession_WithSamples_RoundTrip(t *testing.T) {
+	store := newFakeSessionStore()
+	token := signToken(t, testSecret, "user-1", time.Now().Add(time.Hour))
+	hr := 150
+	body := validSessionBody()
+	body.Samples = []sampleRequest{
+		{TOffsetS: 0, HR: &hr},
+		{TOffsetS: 10, HR: &hr},
+	}
+
+	createRec := doRequest(t, sessionDeps(store), http.MethodPost, "/v1/sessions", "Bearer "+token, body)
+	if createRec.Code != http.StatusCreated {
+		t.Fatalf("create status = %d, want 201; body = %s", createRec.Code, createRec.Body.String())
+	}
+	var created session.Session
+	if err := json.NewDecoder(createRec.Body).Decode(&created); err != nil {
+		t.Fatalf("decode create: %v", err)
+	}
+	if len(created.Samples) != 2 {
+		t.Fatalf("created samples = %d, want 2", len(created.Samples))
+	}
+
+	getRec := doRequest(t, sessionDeps(store), http.MethodGet, "/v1/sessions/"+created.ID, "Bearer "+token, nil)
+	var detail session.Session
+	if err := json.NewDecoder(getRec.Body).Decode(&detail); err != nil {
+		t.Fatalf("decode detail: %v", err)
+	}
+	if len(detail.Samples) != 2 || detail.Samples[0].HR == nil || *detail.Samples[0].HR != 150 {
+		t.Errorf("detail samples not round-tripped: %+v", detail.Samples)
 	}
 }
 

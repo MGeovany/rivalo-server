@@ -22,6 +22,14 @@ type createSessionRequest struct {
 	Intensity    *float64  `json:"intensity"`
 	CaloriesKcal *float64  `json:"calories_kcal"`
 	Source       string    `json:"source"`
+	Samples      []sampleRequest `json:"samples"`
+}
+
+// sampleRequest is one time-series point in a create-session payload.
+type sampleRequest struct {
+	TOffsetS int      `json:"t_offset_s"`
+	HR       *int     `json:"hr"`
+	SpeedKMH *float64 `json:"speed_kmh"`
 }
 
 // handleCreateSession stores a new sport session for the authenticated user.
@@ -164,6 +172,18 @@ func (req createSessionRequest) validate() (session.New, string) {
 		return session.New{}, "calories_kcal must be zero or positive"
 	}
 
+	const maxSamples = 5000
+	if len(req.Samples) > maxSamples {
+		return session.New{}, "too many samples (max 5000)"
+	}
+	samples := make([]session.Sample, 0, len(req.Samples))
+	for _, s := range req.Samples {
+		if s.TOffsetS < 0 {
+			return session.New{}, "sample t_offset_s must be zero or positive"
+		}
+		samples = append(samples, session.Sample{TOffsetS: s.TOffsetS, HR: s.HR, SpeedKMH: s.SpeedKMH})
+	}
+
 	return session.New{
 		StartedAt:    req.StartedAt,
 		EndedAt:      req.EndedAt,
@@ -176,6 +196,7 @@ func (req createSessionRequest) validate() (session.New, string) {
 		Intensity:    req.Intensity,
 		CaloriesKcal: req.CaloriesKcal,
 		Source:       req.Source,
+		Samples:      samples,
 	}, ""
 }
 

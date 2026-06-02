@@ -16,6 +16,10 @@ definitions:
         type: integer
       intensity:
         type: number
+      samples:
+        items:
+          $ref: '#/definitions/httpapi.sampleRequest'
+        type: array
       source:
         type: string
       speed_max_kmh:
@@ -36,6 +40,15 @@ definitions:
         type: string
       status:
         type: string
+    type: object
+  httpapi.sampleRequest:
+    properties:
+      hr:
+        type: integer
+      speed_kmh:
+        type: number
+      t_offset_s:
+        type: integer
     type: object
   httpapi.updateProfileRequest:
     properties:
@@ -65,6 +78,15 @@ definitions:
       weight_kg:
         type: number
     type: object
+  session.Sample:
+    properties:
+      hr:
+        type: integer
+      speed_kmh:
+        type: number
+      t_offset_s:
+        type: integer
+    type: object
   session.Session:
     properties:
       calories_kcal:
@@ -85,6 +107,12 @@ definitions:
         type: string
       intensity:
         type: number
+      samples:
+        description: Samples is the time series, populated on detail reads (Get);
+          nil on List.
+        items:
+          $ref: '#/definitions/session.Sample'
+        type: array
       source:
         type: string
       speed_max_kmh:

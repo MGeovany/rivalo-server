@@ -298,6 +298,12 @@ const docTemplate = `{
                 "intensity": {
                     "type": "number"
                 },
+                "samples": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/httpapi.sampleRequest"
+                    }
+                },
                 "source": {
                     "type": "string"
                 },
@@ -328,6 +334,20 @@ const docTemplate = `{
                 },
                 "status": {
                     "type": "string"
+                }
+            }
+        },
+        "httpapi.sampleRequest": {
+            "type": "object",
+            "properties": {
+                "hr": {
+                    "type": "integer"
+                },
+                "speed_kmh": {
+                    "type": "number"
+                },
+                "t_offset_s": {
+                    "type": "integer"
                 }
             }
         },
@@ -374,6 +394,20 @@ const docTemplate = `{
                 }
             }
         },
+        "session.Sample": {
+            "type": "object",
+            "properties": {
+                "hr": {
+                    "type": "integer"
+                },
+                "speed_kmh": {
+                    "type": "number"
+                },
+                "t_offset_s": {
+                    "type": "integer"
+                }
+            }
+        },
         "session.Session": {
             "type": "object",
             "properties": {
@@ -403,6 +437,13 @@ const docTemplate = `{
                 },
                 "intensity": {
                     "type": "number"
+                },
+                "samples": {
+                    "description": "Samples is the time series, populated on detail reads (Get); nil on List.",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/session.Sample"
+                    }
                 },
                 "source": {
                     "type": "string"
