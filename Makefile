@@ -1,4 +1,4 @@
-.PHONY: dev run test build tidy swagger migrate-status migrate migrate-new migrate-hash seed
+.PHONY: dev run test build tidy swagger migrate-status migrate migrate-new migrate-hash seed upload-player-card-assets
 
 # Reload the server when .go files change (requires no other process on PORT).
 dev:
@@ -46,3 +46,7 @@ migrate-hash:
 # Requires DATABASE_URL, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY in .env.
 seed:
 	go run ./cmd/seed
+
+# Upload layered player card PNGs to Supabase Storage (requires migration applied).
+upload-player-card-assets:
+	@bash scripts/upload-player-card-assets.sh

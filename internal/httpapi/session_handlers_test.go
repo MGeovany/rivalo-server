@@ -312,13 +312,13 @@ func (f *fakeSessionStore) GetInsights(_ context.Context, userID string) (sessio
 		var groups []session.ContextGroup
 		for val, a := range m {
 			g := session.ContextGroup{Value: val, Count: a.count}
-			g.AvgDistance = float64Ptr(a.distanceSum / float64(a.count))
-			g.AvgDurationS = float64Ptr(a.durationSum / float64(a.count))
+			g.AvgDistance = floatPtr(a.distanceSum / float64(a.count))
+			g.AvgDurationS = floatPtr(a.durationSum / float64(a.count))
 			if a.ratingN > 0 {
-				g.AvgMatchRating = float64Ptr(a.ratingSum / float64(a.ratingN))
+				g.AvgMatchRating = floatPtr(a.ratingSum / float64(a.ratingN))
 			}
 			if a.intN > 0 {
-				g.AvgIntensity = float64Ptr(a.intSum / float64(a.intN))
+				g.AvgIntensity = floatPtr(a.intSum / float64(a.intN))
 			}
 			groups = append(groups, g)
 		}
@@ -821,5 +821,4 @@ func TestCreateSession_MatchRating_Computed(t *testing.T) {
 	if *created.MatchRating < 0 || *created.MatchRating > 100 {
 		t.Errorf("match_rating out of 0–100 range: %f", *created.MatchRating)
 	}
-}
 }
