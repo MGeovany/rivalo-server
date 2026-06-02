@@ -410,6 +410,19 @@ func (f *fakeSessionStore) GetStreaks(_ context.Context, userID string) (session
 	return session.BuildStreaks(list, time.Now().UTC()), nil
 }
 
+func (f *fakeSessionStore) GetWeeklyRecap(_ context.Context, userID string) (session.WeeklyRecap, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	var list []session.RecapSession
+	for _, s := range f.items[userID] {
+		list = append(list, session.RecapSession{
+			ID: s.ID, StartedAt: s.StartedAt, DistanceM: s.DistanceM,
+			Sprints: s.Sprints, MatchRating: s.MatchRating,
+		})
+	}
+	return session.BuildWeeklyRecap(list, time.Now().UTC()), nil
+}
+
 func (f *fakeSessionStore) GetPitchStats(_ context.Context, userID, pitchID string) (session.PitchStats, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()

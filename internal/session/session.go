@@ -232,6 +232,8 @@ type Store interface {
 	GetStreaks(ctx context.Context, userID string) (Streaks, error)
 	// GetPitchStats aggregates the user's sessions played at one pitch.
 	GetPitchStats(ctx context.Context, userID, pitchID string) (PitchStats, error)
+	// GetWeeklyRecap summarizes the current ISO week vs the previous one.
+	GetWeeklyRecap(ctx context.Context, userID string) (WeeklyRecap, error)
 }
 
 // PitchStats aggregates a user's sessions at a single pitch.

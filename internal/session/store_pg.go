@@ -539,6 +539,32 @@ func (s *PostgresStore) GetPitchStats(ctx context.Context, userID, pitchID strin
 	return ps, nil
 }
 
+func (s *PostgresStore) GetWeeklyRecap(ctx context.Context, userID string) (WeeklyRecap, error) {
+	// Only the last ~3 weeks are needed for the current-vs-previous comparison.
+	const query = `
+		select id, started_at, distance_m, sprints, match_rating
+		from public.sessions
+		where user_id = $1 and started_at >= now() - interval '21 days'`
+	rows, err := s.pool.Query(ctx, query, userID)
+	if err != nil {
+		return WeeklyRecap{}, err
+	}
+	defer rows.Close()
+
+	var list []RecapSession
+	for rows.Next() {
+		var rs RecapSession
+		if err := rows.Scan(&rs.ID, &rs.StartedAt, &rs.DistanceM, &rs.Sprints, &rs.MatchRating); err != nil {
+			return WeeklyRecap{}, err
+		}
+		list = append(list, rs)
+	}
+	if err := rows.Err(); err != nil {
+		return WeeklyRecap{}, err
+	}
+	return BuildWeeklyRecap(list, time.Now().UTC()), nil
+}
+
 func (s *PostgresStore) loadSamples(ctx context.Context, sessionID string) ([]Sample, error) {
 	const query = `
 		select t_offset_s, hr, speed_kmh, half
