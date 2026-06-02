@@ -47,6 +47,23 @@ Migration SQL is hand-authored: the schema references Supabase's managed `auth` 
 - `rivalo-ios` — app iPhone
 - `rivalo-watch` — app Apple Watch
 
+## Seed (demo user)
+
+Creates (or reuses) auth user `marlongeo1999+mid@gmail.com` with password `Rivalo@123`, a midfielder
+profile, and five fake watch sessions with heart-rate samples.
+
+```bash
+# In .env: DATABASE_URL, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY (service role, not anon key)
+make migrate   # if needed
+make seed
+```
+
+SQL-only variant (user must already exist in Supabase Auth):
+
+```bash
+psql "$DATABASE_URL" -f scripts/seed_demo_user.sql
+```
+
 ## Desarrollo
 
 Requiere Go y un proyecto Supabase. Configuración por variables de entorno (ver `.env` local).

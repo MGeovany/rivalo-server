@@ -1,4 +1,4 @@
-.PHONY: dev run test build tidy swagger migrate-status migrate migrate-new migrate-hash
+.PHONY: dev run test build tidy swagger migrate-status migrate migrate-new migrate-hash seed
 
 # Reload the server when .go files change (requires no other process on PORT).
 dev:
@@ -41,3 +41,8 @@ migrate-new:
 # Recompute the migration directory checksum (run after editing a migration file).
 migrate-hash:
 	atlas migrate hash --dir file://migrations
+
+# Demo user marlongeo1999+mid@gmail.com / Rivalo@123 + 5 fake watch sessions.
+# Requires DATABASE_URL, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY in .env.
+seed:
+	go run ./cmd/seed
