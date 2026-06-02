@@ -7,7 +7,7 @@ import (
 )
 
 // handleGetPositionInsights returns a cautious, physical-only comparison of the
-// user's positions (V2-J). It never declares a "best" position.
+// user's positions. It never declares a "best" position.
 //
 //	@Summary		Position insights
 //	@Description	Physical averages per position with neutral comparisons. Requires at least 3 sessions in each of 2+ positions; otherwise has_enough_data is false.

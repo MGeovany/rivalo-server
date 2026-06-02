@@ -1,4 +1,4 @@
-// Package pitch manages saved playing fields/courts (V2).
+// Package pitch manages saved playing fields/courts.
 package pitch
 
 import (

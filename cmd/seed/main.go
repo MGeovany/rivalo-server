@@ -457,7 +457,7 @@ func parseResult(result string) (outcome, score string) {
 	return outcome, score
 }
 
-// deriveCompetition maps the legacy match_tag to a V3 competition, promoting a
+// deriveCompetition maps the legacy match_tag to a competition, promoting a
 // few league matches to "tournament" so the seed exercises all enum values.
 func deriveCompetition(matchTag string, index int) string {
 	switch matchTag {

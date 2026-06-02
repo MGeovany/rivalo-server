@@ -395,6 +395,21 @@ func (f *fakeSessionStore) GetPositionInsights(_ context.Context, userID string)
 	return session.AssemblePositionInsights(all), nil
 }
 
+func (f *fakeSessionStore) GetStreaks(_ context.Context, userID string) (session.Streaks, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	var list []session.StreakSession
+	for _, s := range f.items[userID] {
+		list = append(list, session.StreakSession{
+			StartedAt:   s.StartedAt,
+			Sprints:     s.Sprints,
+			MatchRating: s.MatchRating,
+			Structured:  s.Mode == session.ModeStructured,
+		})
+	}
+	return session.BuildStreaks(list, time.Now().UTC()), nil
+}
+
 func (f *fakeSessionStore) Delete(_ context.Context, userID, id string) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()

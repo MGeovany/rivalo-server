@@ -454,6 +454,76 @@ func (s *PostgresStore) GetPositionInsights(ctx context.Context, userID string) 
 	return AssemblePositionInsights(all), nil
 }
 
+func (s *PostgresStore) GetStreaks(ctx context.Context, userID string) (Streaks, error) {
+	// Per-structured-session fatigue proxy: half-1 vs half-2 average speed.
+	const fatigueQuery = `
+		select s.id,
+			avg(case when ss.half = 1 then ss.speed_kmh end),
+			avg(case when ss.half = 2 then ss.speed_kmh end),
+			count(case when ss.half = 1 then 1 end),
+			count(case when ss.half = 2 then 1 end)
+		from public.sessions s
+		join public.session_samples ss on ss.session_id = s.id
+		where s.user_id = $1 and s.mode = $2 and s.halftime_offset_s is not null
+		group by s.id`
+
+	controlled := map[string]bool{}
+	rows, err := s.pool.Query(ctx, fatigueQuery, userID, ModeStructured)
+	if err != nil {
+		return Streaks{}, err
+	}
+	for rows.Next() {
+		var id string
+		var h1, h2 *float64
+		var n1, n2 int
+		if err := rows.Scan(&id, &h1, &h2, &n1, &n2); err != nil {
+			rows.Close()
+			return Streaks{}, err
+		}
+		if n1 >= 6 && n2 >= 6 && h1 != nil && h2 != nil && *h1 > 0 {
+			drop := (*h1 - *h2) / *h1
+			controlled[id] = drop <= FatigueControlledMax
+		}
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return Streaks{}, err
+	}
+
+	const sessionsQuery = `
+		select id, started_at, sprints, match_rating, mode
+		from public.sessions
+		where user_id = $1`
+	srows, err := s.pool.Query(ctx, sessionsQuery, userID)
+	if err != nil {
+		return Streaks{}, err
+	}
+	defer srows.Close()
+
+	var list []StreakSession
+	for srows.Next() {
+		var id, mode string
+		var started time.Time
+		var sprints int
+		var rating *float64
+		if err := srows.Scan(&id, &started, &sprints, &rating, &mode); err != nil {
+			return Streaks{}, err
+		}
+		ss := StreakSession{StartedAt: started, Sprints: sprints, MatchRating: rating, Structured: mode == ModeStructured}
+		if ss.Structured {
+			if v, ok := controlled[id]; ok {
+				ss.FatigueControlled = &v
+			}
+		}
+		list = append(list, ss)
+	}
+	if err := srows.Err(); err != nil {
+		return Streaks{}, err
+	}
+
+	return BuildStreaks(list, time.Now().UTC()), nil
+}
+
 func (s *PostgresStore) loadSamples(ctx context.Context, sessionID string) ([]Sample, error) {
 	const query = `
 		select t_offset_s, hr, speed_kmh, half

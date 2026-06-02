@@ -3,7 +3,7 @@ package session
 import "fmt"
 
 // MinInsightSessions is the minimum number of sessions required before any
-// rule-based insight is produced (V2-H). Below this, BuildInsights returns nil.
+// rule-based insight is produced. Below this, BuildInsights returns nil.
 const MinInsightSessions = 5
 
 // BuildInsights derives explainable, rule-based statements from aggregate

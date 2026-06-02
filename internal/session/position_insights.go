@@ -7,7 +7,7 @@ import (
 
 const (
 	// MinSessionsPerPosition is the minimum sessions a position needs before it
-	// is considered for comparison (V2-J).
+	// is considered for comparison.
 	MinSessionsPerPosition = 3
 	// MinPositionsToCompare is the minimum number of qualifying positions needed
 	// to draw any comparison.

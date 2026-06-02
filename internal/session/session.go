@@ -17,7 +17,7 @@ const (
 	SourceWatch  = "watch"
 )
 
-// Valid session modes (V2).
+// Valid session modes.
 const (
 	ModeQuick      = "quick"
 	ModeStructured = "structured"
@@ -49,7 +49,7 @@ const (
 	MatchTagLeague   = "league"
 	MatchTagTraining = "training"
 
-	// V3 structured result.
+	// Structured result.
 	OutcomeWin  = "win"
 	OutcomeDraw = "draw"
 	OutcomeLoss = "loss"
@@ -76,7 +76,7 @@ type Sample struct {
 	Half     *int     `json:"half,omitempty"`
 }
 
-// PathPoint is one GPS sample on the pitch trajectory (V2 session_path).
+// PathPoint is one GPS sample on the pitch trajectory (session_path).
 type PathPoint struct {
 	TOffsetS  int     `json:"t_offset_s"`
 	Latitude  float64 `json:"latitude"`
@@ -108,7 +108,7 @@ type Session struct {
 	Feeling       *int     `json:"feeling,omitempty"`
 	MatchTag      *string  `json:"match_tag,omitempty"`
 	Opponent      *string  `json:"opponent,omitempty"`
-	// V3 structured result (post-match, optional).
+	// Structured result (post-match, optional).
 	Outcome       *string  `json:"outcome,omitempty"`
 	Score         *string  `json:"score,omitempty"`
 	Competition   *string  `json:"competition,omitempty"`
@@ -228,6 +228,8 @@ type Store interface {
 	// GetInsights returns aggregated stats and per-context breakdowns.
 	GetInsights(ctx context.Context, userID string) (SessionInsights, error)
 	GetPositionInsights(ctx context.Context, userID string) (PositionInsights, error)
+	// GetStreaks returns the weekly streak and special performance streaks.
+	GetStreaks(ctx context.Context, userID string) (Streaks, error)
 }
 
 // Update carries editable aggregate fields (samples are not modified).
