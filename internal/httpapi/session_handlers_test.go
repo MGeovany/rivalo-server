@@ -48,6 +48,7 @@ func (f *fakeSessionStore) Create(_ context.Context, userID string, n session.Ne
 		MatchRating:  n.MatchRating,
 		PitchID:      n.PitchID,
 		Samples:      n.Samples,
+		Path:         n.Path,
 		CreatedAt:    n.StartedAt,
 	}
 	f.items[userID] = append(f.items[userID], s)
@@ -685,6 +686,53 @@ func TestCreateSession_MatchRating_NoHR_NoSamples(t *testing.T) {
 	}
 	if created.MatchRating != nil {
 		t.Errorf("match_rating should be nil without HR samples, got %v", *created.MatchRating)
+	}
+}
+
+func TestCreateSession_Path_RoundTrip(t *testing.T) {
+	store := newFakeSessionStore()
+	token := signToken(t, testSecret, "user-1", time.Now().Add(time.Hour))
+	body := validSessionBody()
+	body.Path = []pathPointRequest{
+		{TOffsetS: 0, Latitude: 14.0818, Longitude: -87.2068},
+		{TOffsetS: 10, Latitude: 14.0820, Longitude: -87.2070},
+		{TOffsetS: 20, Latitude: 14.0822, Longitude: -87.2072},
+	}
+
+	createRec := doRequest(t, sessionDeps(store), http.MethodPost, "/v1/sessions", "Bearer "+token, body)
+	if createRec.Code != http.StatusCreated {
+		t.Fatalf("create status = %d, want 201; body = %s", createRec.Code, createRec.Body.String())
+	}
+	var created session.Session
+	if err := json.NewDecoder(createRec.Body).Decode(&created); err != nil {
+		t.Fatalf("decode create: %v", err)
+	}
+
+	getRec := doRequest(t, sessionDeps(store), http.MethodGet, "/v1/sessions/"+created.ID, "Bearer "+token, nil)
+	if getRec.Code != http.StatusOK {
+		t.Fatalf("get status = %d, want 200", getRec.Code)
+	}
+	var detail session.Session
+	if err := json.NewDecoder(getRec.Body).Decode(&detail); err != nil {
+		t.Fatalf("decode detail: %v", err)
+	}
+	if len(detail.Path) != 3 {
+		t.Fatalf("path length = %d, want 3", len(detail.Path))
+	}
+	if detail.Path[1].Latitude != 14.0820 || detail.Path[1].Longitude != -87.2070 {
+		t.Errorf("path[1] = %+v, want lat 14.0820 lon -87.2070", detail.Path[1])
+	}
+}
+
+func TestCreateSession_Path_InvalidLatitude_400(t *testing.T) {
+	store := newFakeSessionStore()
+	token := signToken(t, testSecret, "user-1", time.Now().Add(time.Hour))
+	body := validSessionBody()
+	body.Path = []pathPointRequest{{TOffsetS: 0, Latitude: 200, Longitude: 0}}
+
+	rec := doRequest(t, sessionDeps(store), http.MethodPost, "/v1/sessions", "Bearer "+token, body)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400; body = %s", rec.Code, rec.Body.String())
 	}
 }
 

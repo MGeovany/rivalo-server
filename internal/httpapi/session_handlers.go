@@ -25,6 +25,7 @@ type createSessionRequest struct {
 	Mode            string `json:"mode"`
 	HalftimeOffsetS *int   `json:"halftime_offset_s"`
 	Samples      []sampleRequest `json:"samples"`
+	Path         []pathPointRequest `json:"path"`
 	PitchID      *string         `json:"pitch_id"`
 }
 
@@ -34,6 +35,13 @@ type sampleRequest struct {
 	HR       *int     `json:"hr"`
 	SpeedKMH *float64 `json:"speed_kmh"`
 	Half     *int     `json:"half"`
+}
+
+// pathPointRequest is one GPS trajectory point in a create-session payload.
+type pathPointRequest struct {
+	TOffsetS  int     `json:"t_offset_s"`
+	Latitude  float64 `json:"latitude"`
+	Longitude float64 `json:"longitude"`
 }
 
 // handleCreateSession stores a new sport session for the authenticated user.
@@ -442,6 +450,24 @@ func (req createSessionRequest) validate() (session.New, string) {
 		samples = append(samples, session.Sample{TOffsetS: s.TOffsetS, HR: s.HR, SpeedKMH: s.SpeedKMH, Half: s.Half})
 	}
 
+	const maxPathPoints = 10000
+	if len(req.Path) > maxPathPoints {
+		return session.New{}, "too many path points (max 10000)"
+	}
+	path := make([]session.PathPoint, 0, len(req.Path))
+	for _, p := range req.Path {
+		if p.TOffsetS < 0 {
+			return session.New{}, "path t_offset_s must be zero or positive"
+		}
+		if p.Latitude < -90 || p.Latitude > 90 {
+			return session.New{}, "path latitude must be between -90 and 90"
+		}
+		if p.Longitude < -180 || p.Longitude > 180 {
+			return session.New{}, "path longitude must be between -180 and 180"
+		}
+		path = append(path, session.PathPoint{TOffsetS: p.TOffsetS, Latitude: p.Latitude, Longitude: p.Longitude})
+	}
+
 	return session.New{
 		StartedAt:    req.StartedAt,
 		EndedAt:      req.EndedAt,
@@ -457,6 +483,7 @@ func (req createSessionRequest) validate() (session.New, string) {
 		Mode:         mode,
 		HalftimeOffsetS: req.HalftimeOffsetS,
 		Samples:      samples,
+		Path:         path,
 		PitchID:      req.PitchID,
 	}, ""
 }

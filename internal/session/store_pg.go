@@ -63,10 +63,26 @@ func (s *PostgresStore) Create(ctx context.Context, userID string, n New) (Sessi
 		}
 	}
 
+	if len(n.Path) > 0 {
+		rows := make([][]any, len(n.Path))
+		for i, pt := range n.Path {
+			rows[i] = []any{sess.ID, pt.TOffsetS, pt.Latitude, pt.Longitude}
+		}
+		_, err = tx.CopyFrom(ctx,
+			pgx.Identifier{"public", "session_path"},
+			[]string{"session_id", "t_offset_s", "latitude", "longitude"},
+			pgx.CopyFromRows(rows),
+		)
+		if err != nil {
+			return Session{}, err
+		}
+	}
+
 	if err := tx.Commit(ctx); err != nil {
 		return Session{}, err
 	}
 	sess.Samples = n.Samples
+	sess.Path = n.Path
 	return sess, nil
 }
 

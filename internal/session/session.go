@@ -122,6 +122,7 @@ type New struct {
 	Mode         string
 	HalftimeOffsetS *int
 	Samples      []Sample
+	Path         []PathPoint
 	MatchRating  *float64
 	PitchID      *string
 }
