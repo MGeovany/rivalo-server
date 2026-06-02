@@ -93,6 +93,8 @@ type Session struct {
 	CreatedAt     time.Time `json:"created_at"`
 	// Samples is the time series, populated on detail reads (Get); nil on List.
 	Samples []Sample `json:"samples,omitempty"`
+	// FatigueDrop is computed on-read for structured sessions; nil otherwise.
+	FatigueDrop *FatigueDrop `json:"fatigue_drop,omitempty"`
 }
 
 // New carries the fields needed to create a session.

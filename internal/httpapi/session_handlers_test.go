@@ -468,6 +468,113 @@ func TestCreateSession_MatchRating_NoHR_NoSamples(t *testing.T) {
 	}
 }
 
+func TestGetSession_FatigueDrop_Structured(t *testing.T) {
+	store := newFakeSessionStore()
+	token := signToken(t, testSecret, "user-1", time.Now().Add(time.Hour))
+	hr := 170 // above 85% of 190 -> triggers high intensity
+	hrMax := 190
+	half1, half2 := 1, 2
+	offset := 2700
+	body := validSessionBody()
+	body.Mode = session.ModeStructured
+	body.HalftimeOffsetS = &offset
+	body.HRMax = &hrMax
+	for i := range 20 {
+		h := half1
+		if i >= 10 {
+			h = half2
+		}
+		body.Samples = append(body.Samples, sampleRequest{
+			TOffsetS: i * 300,
+			HR:       &hr,
+			Half:     &h,
+		})
+	}
+
+	createRec := doRequest(t, sessionDeps(store), http.MethodPost, "/v1/sessions", "Bearer "+token, body)
+	if createRec.Code != http.StatusCreated {
+		t.Fatalf("create status = %d, want 201; body = %s", createRec.Code, createRec.Body.String())
+	}
+	var created session.Session
+	if err := json.NewDecoder(createRec.Body).Decode(&created); err != nil {
+		t.Fatalf("decode create: %v", err)
+	}
+
+	getRec := doRequest(t, sessionDeps(store), http.MethodGet, "/v1/sessions/"+created.ID, "Bearer "+token, nil)
+	if getRec.Code != http.StatusOK {
+		t.Fatalf("get status = %d, want 200", getRec.Code)
+	}
+	var detail session.Session
+	if err := json.NewDecoder(getRec.Body).Decode(&detail); err != nil {
+		t.Fatalf("decode detail: %v", err)
+	}
+	if detail.FatigueDrop == nil {
+		t.Fatal("fatigue_drop should not be nil for a structured session with valid halves")
+	}
+	if detail.FatigueDrop.FirstHalf.SampleCount < 6 {
+		t.Errorf("first half sample count = %d, want ≥ 6", detail.FatigueDrop.FirstHalf.SampleCount)
+	}
+	if detail.FatigueDrop.SecondHalf.SampleCount < 6 {
+		t.Errorf("second half sample count = %d, want ≥ 6", detail.FatigueDrop.SecondHalf.SampleCount)
+	}
+	if detail.FatigueDrop.HRAvgPctChange == nil {
+		t.Error("hr_avg_pct_change should not be nil")
+	}
+	if detail.FatigueDrop.HighIntensityPctChange == nil {
+		t.Error("high_intensity_pct_change should not be nil")
+	}
+}
+
+func TestGetSession_FatigueDrop_NotEnoughSamples(t *testing.T) {
+	store := newFakeSessionStore()
+	token := signToken(t, testSecret, "user-1", time.Now().Add(time.Hour))
+	hr := 150
+	half1 := 1
+	offset := 2700
+	body := validSessionBody()
+	body.Mode = session.ModeStructured
+	body.HalftimeOffsetS = &offset
+	body.Samples = []sampleRequest{
+		{TOffsetS: 0, HR: &hr, Half: &half1},
+		{TOffsetS: 10, HR: &hr, Half: &half1},
+	}
+
+	createRec := doRequest(t, sessionDeps(store), http.MethodPost, "/v1/sessions", "Bearer "+token, body)
+	var created session.Session
+	_ = json.NewDecoder(createRec.Body).Decode(&created)
+
+	getRec := doRequest(t, sessionDeps(store), http.MethodGet, "/v1/sessions/"+created.ID, "Bearer "+token, nil)
+	if getRec.Code != http.StatusOK {
+		t.Fatalf("get status = %d, want 200", getRec.Code)
+	}
+	var detail session.Session
+	if err := json.NewDecoder(getRec.Body).Decode(&detail); err != nil {
+		t.Fatalf("decode detail: %v", err)
+	}
+	if detail.FatigueDrop != nil {
+		t.Error("fatigue_drop should be nil for a session with insufficient samples")
+	}
+}
+
+func TestGetSession_FatigueDrop_QuickMode(t *testing.T) {
+	store := newFakeSessionStore()
+	token := signToken(t, testSecret, "user-1", time.Now().Add(time.Hour))
+	body := validSessionBody() // mode defaults to quick
+
+	createRec := doRequest(t, sessionDeps(store), http.MethodPost, "/v1/sessions", "Bearer "+token, body)
+	var created session.Session
+	_ = json.NewDecoder(createRec.Body).Decode(&created)
+
+	getRec := doRequest(t, sessionDeps(store), http.MethodGet, "/v1/sessions/"+created.ID, "Bearer "+token, nil)
+	var detail session.Session
+	if err := json.NewDecoder(getRec.Body).Decode(&detail); err != nil {
+		t.Fatalf("decode detail: %v", err)
+	}
+	if detail.FatigueDrop != nil {
+		t.Error("fatigue_drop should be nil for a quick session without halves")
+	}
+}
+
 func TestCreateSession_MatchRating_Computed(t *testing.T) {
 	store := newFakeSessionStore()
 	token := signToken(t, testSecret, "user-1", time.Now().Add(time.Hour))

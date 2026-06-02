@@ -158,7 +158,36 @@ func (d Deps) handleGetSession(w http.ResponseWriter, r *http.Request) {
 		logAndWriteError(w, http.StatusInternalServerError, "could not load session", "session_get_failed", err, logger.Ref("user", uid), logger.Ref("session", id))
 		return
 	}
+
+	// Compute Fatigue Drop for structured sessions on read.
+	if found.Mode == session.ModeStructured && found.HalftimeOffsetS != nil {
+		hrMax := resolveHRMax(r, d, uid, found.HRMax)
+		found.FatigueDrop = session.ComputeFatigueDrop(found.Mode, found.Samples, found.HalftimeOffsetS, hrMax)
+	}
+
 	writeJSON(w, http.StatusOK, found)
+}
+
+// resolveHRMax returns the best available HRmax for a user: from the profile's
+// birth_year (Tanaka formula) if available, or the observed max HR from the
+// session as fallback.
+func resolveHRMax(r *http.Request, d Deps, uid string, observedMax *int) int {
+	if d.Profiles != nil {
+		profile, err := d.Profiles.GetOrCreate(r.Context(), uid)
+		if err == nil && profile.BirthYear != nil {
+			estimated := session.HRmaxByAge(*profile.BirthYear, time.Now().Year())
+			if observedMax != nil && estimated > *observedMax {
+				return estimated
+			}
+			if observedMax == nil {
+				return estimated
+			}
+		}
+	}
+	if observedMax != nil {
+		return *observedMax
+	}
+	return 220 // absolute fallback (unlikely to be reached in practice)
 }
 
 // updateSessionRequest is the JSON body accepted by PUT /v1/sessions/{id}.
