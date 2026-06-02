@@ -1,7 +1,6 @@
 package httpapi
 
 import (
-	"encoding/json"
 	"errors"
 	"net/http"
 	"time"
@@ -46,7 +45,7 @@ func (d Deps) handleCreateSession(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req createSessionRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := decodeJSON(w, r, &req); err != nil {
 		logger.Warn("session_create_rejected", "reason", "invalid_json")
 		writeError(w, http.StatusBadRequest, "invalid JSON body")
 		return

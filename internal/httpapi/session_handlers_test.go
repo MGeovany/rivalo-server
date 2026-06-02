@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -102,6 +103,15 @@ func TestCreateSession_Valid_201(t *testing.T) {
 	}
 	if s.UserID != "user-1" || s.Source != session.SourceManual || s.ID == "" {
 		t.Errorf("unexpected session: %+v", s)
+	}
+}
+
+func TestCreateSession_OversizedBody_400(t *testing.T) {
+	token := signToken(t, testSecret, "user-1", time.Now().Add(time.Hour))
+	body := map[string]string{"source": "manual", "junk": strings.Repeat("a", 2<<20)} // ~2 MiB
+	rec := doRequest(t, sessionDeps(newFakeSessionStore()), http.MethodPost, "/v1/sessions", "Bearer "+token, body)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400 (oversized body must be rejected)", rec.Code)
 	}
 }
 

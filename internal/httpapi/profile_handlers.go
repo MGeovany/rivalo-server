@@ -1,7 +1,6 @@
 package httpapi
 
 import (
-	"encoding/json"
 	"net/http"
 	"strings"
 
@@ -68,7 +67,7 @@ func (d Deps) handleUpdateMe(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req updateProfileRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := decodeJSON(w, r, &req); err != nil {
 		logger.Warn("profile_update_rejected", "reason", "invalid_json")
 		writeError(w, http.StatusBadRequest, "invalid JSON body")
 		return
