@@ -43,6 +43,8 @@ func (f *fakeSessionStore) Create(_ context.Context, userID string, n session.Ne
 		Intensity:    n.Intensity,
 		CaloriesKcal: n.CaloriesKcal,
 		Source:       n.Source,
+		Mode:         n.Mode,
+		HalftimeOffsetS: n.HalftimeOffsetS,
 		Samples:      n.Samples,
 		CreatedAt:    n.StartedAt,
 	}
@@ -180,6 +182,72 @@ func TestSession_WithSamples_RoundTrip(t *testing.T) {
 	}
 	if len(detail.Samples) != 2 || detail.Samples[0].HR == nil || *detail.Samples[0].HR != 150 {
 		t.Errorf("detail samples not round-tripped: %+v", detail.Samples)
+	}
+}
+
+func TestCreateSession_StructuredWithHalves(t *testing.T) {
+	store := newFakeSessionStore()
+	token := signToken(t, testSecret, "user-1", time.Now().Add(time.Hour))
+	hr := 150
+	half1, half2 := 1, 2
+	offset := 2700
+	body := validSessionBody()
+	body.Source = session.SourceWatch
+	body.Mode = session.ModeStructured
+	body.HalftimeOffsetS = &offset
+	body.Samples = []sampleRequest{
+		{TOffsetS: 0, HR: &hr, Half: &half1},
+		{TOffsetS: 3000, HR: &hr, Half: &half2},
+	}
+
+	rec := doRequest(t, sessionDeps(store), http.MethodPost, "/v1/sessions", "Bearer "+token, body)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want 201; body = %s", rec.Code, rec.Body.String())
+	}
+	var created session.Session
+	if err := json.NewDecoder(rec.Body).Decode(&created); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if created.Mode != session.ModeStructured {
+		t.Errorf("mode = %q, want structured", created.Mode)
+	}
+	if created.HalftimeOffsetS == nil || *created.HalftimeOffsetS != offset {
+		t.Errorf("halftime offset not persisted: %+v", created.HalftimeOffsetS)
+	}
+	if len(created.Samples) != 2 || created.Samples[0].Half == nil || *created.Samples[0].Half != 1 {
+		t.Errorf("sample half not persisted: %+v", created.Samples)
+	}
+}
+
+func TestCreateSession_InvalidMode_400(t *testing.T) {
+	token := signToken(t, testSecret, "user-1", time.Now().Add(time.Hour))
+	body := validSessionBody()
+	body.Mode = "tournament"
+	rec := doRequest(t, sessionDeps(newFakeSessionStore()), http.MethodPost, "/v1/sessions", "Bearer "+token, body)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400", rec.Code)
+	}
+}
+
+func TestCreateSession_HalftimeOnNonStructured_400(t *testing.T) {
+	token := signToken(t, testSecret, "user-1", time.Now().Add(time.Hour))
+	offset := 1000
+	body := validSessionBody() // mode defaults to quick
+	body.HalftimeOffsetS = &offset
+	rec := doRequest(t, sessionDeps(newFakeSessionStore()), http.MethodPost, "/v1/sessions", "Bearer "+token, body)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400 (halftime only for structured)", rec.Code)
+	}
+}
+
+func TestCreateSession_DefaultsToQuick(t *testing.T) {
+	store := newFakeSessionStore()
+	token := signToken(t, testSecret, "user-1", time.Now().Add(time.Hour))
+	rec := doRequest(t, sessionDeps(store), http.MethodPost, "/v1/sessions", "Bearer "+token, validSessionBody())
+	var created session.Session
+	_ = json.NewDecoder(rec.Body).Decode(&created)
+	if created.Mode != session.ModeQuick {
+		t.Errorf("mode = %q, want quick (default)", created.Mode)
 	}
 }
 

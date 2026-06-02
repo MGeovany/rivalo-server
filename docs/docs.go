@@ -289,6 +289,9 @@ const docTemplate = `{
                 "ended_at": {
                     "type": "string"
                 },
+                "halftime_offset_s": {
+                    "type": "integer"
+                },
                 "hr_avg": {
                     "type": "integer"
                 },
@@ -297,6 +300,9 @@ const docTemplate = `{
                 },
                 "intensity": {
                     "type": "number"
+                },
+                "mode": {
+                    "type": "string"
                 },
                 "samples": {
                     "type": "array",
@@ -340,6 +346,9 @@ const docTemplate = `{
         "httpapi.sampleRequest": {
             "type": "object",
             "properties": {
+                "half": {
+                    "type": "integer"
+                },
                 "hr": {
                     "type": "integer"
                 },
@@ -397,6 +406,9 @@ const docTemplate = `{
         "session.Sample": {
             "type": "object",
             "properties": {
+                "half": {
+                    "type": "integer"
+                },
                 "hr": {
                     "type": "integer"
                 },
@@ -426,6 +438,9 @@ const docTemplate = `{
                 "ended_at": {
                     "type": "string"
                 },
+                "halftime_offset_s": {
+                    "type": "integer"
+                },
                 "hr_avg": {
                     "type": "integer"
                 },
@@ -437,6 +452,9 @@ const docTemplate = `{
                 },
                 "intensity": {
                     "type": "number"
+                },
+                "mode": {
+                    "type": "string"
                 },
                 "samples": {
                     "description": "Samples is the time series, populated on detail reads (Get); nil on List.",

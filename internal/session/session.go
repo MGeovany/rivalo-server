@@ -17,11 +17,20 @@ const (
 	SourceWatch  = "watch"
 )
 
-// Sample is one point in a session's time series.
+// Valid session modes (V2).
+const (
+	ModeQuick      = "quick"
+	ModeStructured = "structured"
+	ModeTraining   = "training"
+)
+
+// Sample is one point in a session's time series. Half is 1 or 2 for structured
+// matches (nil otherwise).
 type Sample struct {
 	TOffsetS int      `json:"t_offset_s"`
 	HR       *int     `json:"hr"`
 	SpeedKMH *float64 `json:"speed_kmh"`
+	Half     *int     `json:"half,omitempty"`
 }
 
 // Session is a recorded sport session with its aggregate metrics.
@@ -39,6 +48,8 @@ type Session struct {
 	Intensity    *float64  `json:"intensity"`
 	CaloriesKcal *float64  `json:"calories_kcal"`
 	Source       string    `json:"source"`
+	Mode         string    `json:"mode"`
+	HalftimeOffsetS *int   `json:"halftime_offset_s,omitempty"`
 	CreatedAt    time.Time `json:"created_at"`
 	// Samples is the time series, populated on detail reads (Get); nil on List.
 	Samples []Sample `json:"samples,omitempty"`
@@ -57,6 +68,8 @@ type New struct {
 	Intensity    *float64
 	CaloriesKcal *float64
 	Source       string
+	Mode         string
+	HalftimeOffsetS *int
 	Samples      []Sample
 }
 

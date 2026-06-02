@@ -22,6 +22,8 @@ type createSessionRequest struct {
 	Intensity    *float64  `json:"intensity"`
 	CaloriesKcal *float64  `json:"calories_kcal"`
 	Source       string    `json:"source"`
+	Mode            string `json:"mode"`
+	HalftimeOffsetS *int   `json:"halftime_offset_s"`
 	Samples      []sampleRequest `json:"samples"`
 }
 
@@ -30,6 +32,7 @@ type sampleRequest struct {
 	TOffsetS int      `json:"t_offset_s"`
 	HR       *int     `json:"hr"`
 	SpeedKMH *float64 `json:"speed_kmh"`
+	Half     *int     `json:"half"`
 }
 
 // handleCreateSession stores a new sport session for the authenticated user.
@@ -277,6 +280,25 @@ func (req createSessionRequest) validate() (session.New, string) {
 		return session.New{}, "calories_kcal must be zero or positive"
 	}
 
+	// Mode: default to quick when unset; only structured carries a halftime.
+	mode := req.Mode
+	if mode == "" {
+		mode = session.ModeQuick
+	}
+	switch mode {
+	case session.ModeQuick, session.ModeStructured, session.ModeTraining:
+	default:
+		return session.New{}, "mode must be 'quick', 'structured' or 'training'"
+	}
+	if req.HalftimeOffsetS != nil {
+		if mode != session.ModeStructured {
+			return session.New{}, "halftime_offset_s is only valid for a structured match"
+		}
+		if *req.HalftimeOffsetS < 0 || *req.HalftimeOffsetS > req.DurationS {
+			return session.New{}, "halftime_offset_s must be within the session duration"
+		}
+	}
+
 	const maxSamples = 5000
 	if len(req.Samples) > maxSamples {
 		return session.New{}, "too many samples (max 5000)"
@@ -286,7 +308,10 @@ func (req createSessionRequest) validate() (session.New, string) {
 		if s.TOffsetS < 0 {
 			return session.New{}, "sample t_offset_s must be zero or positive"
 		}
-		samples = append(samples, session.Sample{TOffsetS: s.TOffsetS, HR: s.HR, SpeedKMH: s.SpeedKMH})
+		if s.Half != nil && *s.Half != 1 && *s.Half != 2 {
+			return session.New{}, "sample half must be 1 or 2"
+		}
+		samples = append(samples, session.Sample{TOffsetS: s.TOffsetS, HR: s.HR, SpeedKMH: s.SpeedKMH, Half: s.Half})
 	}
 
 	return session.New{
@@ -301,6 +326,8 @@ func (req createSessionRequest) validate() (session.New, string) {
 		Intensity:    req.Intensity,
 		CaloriesKcal: req.CaloriesKcal,
 		Source:       req.Source,
+		Mode:         mode,
+		HalftimeOffsetS: req.HalftimeOffsetS,
 		Samples:      samples,
 	}, ""
 }
