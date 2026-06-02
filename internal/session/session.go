@@ -24,6 +24,37 @@ const (
 	ModeTraining   = "training"
 )
 
+// Valid context enums.
+const (
+	MatchType5aside  = "5-a-side"
+	MatchType7aside  = "7-a-side"
+	MatchType9aside  = "9-a-side"
+	MatchType11aside = "11-a-side"
+	MatchTypeOther   = "Other"
+
+	SurfaceNaturalGrass   = "Natural grass"
+	SurfaceArtificialTurf = "Artificial turf"
+	SurfaceIndoor         = "Indoor"
+	SurfaceConcrete       = "Concrete"
+	SurfaceOther          = "Other"
+
+	PositionGoalkeeper = "Goalkeeper"
+	PositionDefender   = "Defender"
+	PositionFullBack   = "Full-back"
+	PositionMidfielder = "Midfielder"
+	PositionWinger     = "Winger"
+	PositionForward    = "Forward"
+
+	MatchTagFriendly = "friendly"
+	MatchTagLeague   = "league"
+	MatchTagTraining = "training"
+)
+
+var ValidMatchTypes = []string{MatchType5aside, MatchType7aside, MatchType9aside, MatchType11aside, MatchTypeOther}
+var ValidSurfaces = []string{SurfaceNaturalGrass, SurfaceArtificialTurf, SurfaceIndoor, SurfaceConcrete, SurfaceOther}
+var ValidPositions = []string{PositionGoalkeeper, PositionDefender, PositionFullBack, PositionMidfielder, PositionWinger, PositionForward}
+var ValidMatchTags = []string{MatchTagFriendly, MatchTagLeague, MatchTagTraining}
+
 // Sample is one point in a session's time series. Half is 1 or 2 for structured
 // matches (nil otherwise).
 type Sample struct {
@@ -50,7 +81,16 @@ type Session struct {
 	Source       string    `json:"source"`
 	Mode         string    `json:"mode"`
 	HalftimeOffsetS *int   `json:"halftime_offset_s,omitempty"`
-	CreatedAt    time.Time `json:"created_at"`
+	// Context fields (post-match, optional)
+	MatchType     *string  `json:"match_type,omitempty"`
+	Surface       *string  `json:"surface,omitempty"`
+	Position      *string  `json:"position,omitempty"`
+	Result        *string  `json:"result,omitempty"`
+	Feeling       *int     `json:"feeling,omitempty"`
+	MatchTag      *string  `json:"match_tag,omitempty"`
+	PitchID       *string  `json:"pitch_id,omitempty"`
+	MatchRating   *float64 `json:"match_rating,omitempty"`
+	CreatedAt     time.Time `json:"created_at"`
 	// Samples is the time series, populated on detail reads (Get); nil on List.
 	Samples []Sample `json:"samples,omitempty"`
 }
@@ -71,6 +111,7 @@ type New struct {
 	Mode         string
 	HalftimeOffsetS *int
 	Samples      []Sample
+	MatchRating  *float64
 }
 
 // Store persists sport sessions.
@@ -83,6 +124,8 @@ type Store interface {
 	Get(ctx context.Context, userID, id string) (Session, error)
 	// Update replaces aggregate fields on an owned session.
 	Update(ctx context.Context, userID, id string, u Update) (Session, error)
+	// UpdateContext patches post-match context fields (does not touch metrics).
+	UpdateContext(ctx context.Context, userID, id string, cu ContextUpdate) (Session, error)
 	// Delete removes a session owned by userID.
 	Delete(ctx context.Context, userID, id string) error
 }
@@ -99,4 +142,15 @@ type Update struct {
 	Sprints      int
 	Intensity    *float64
 	CaloriesKcal *float64
+}
+
+// ContextUpdate carries the post-match context fields that can be PATCHed.
+type ContextUpdate struct {
+	MatchType *string
+	Surface   *string
+	Position  *string
+	Result    *string
+	Feeling   *int
+	MatchTag  *string
+	PitchID   *string
 }

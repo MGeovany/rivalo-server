@@ -13,6 +13,7 @@ type Profile struct {
 	PreferredPosition *string   `json:"preferred_position"`
 	HeightCM          *int      `json:"height_cm"`
 	WeightKG          *float64  `json:"weight_kg"`
+	BirthYear         *int      `json:"birth_year"`
 	CreatedAt         time.Time `json:"created_at"`
 	UpdatedAt         time.Time `json:"updated_at"`
 }
@@ -23,6 +24,7 @@ type Update struct {
 	PreferredPosition *string
 	HeightCM          *int
 	WeightKG          *float64
+	BirthYear         *int
 }
 
 // Store persists profiles.

@@ -68,6 +68,12 @@ func (d Deps) handleCreateSession(w http.ResponseWriter, r *http.Request) {
 	}
 
 	uid := userID(r.Context())
+
+	// Compute match_rating if we have HR samples and a profile/birth_year.
+	rating := computeMatchRating(r, d, uid, newSession)
+
+	newSession.MatchRating = rating
+
 	created, err := d.Sessions.Create(r.Context(), uid, newSession)
 	if err != nil {
 		logAndWriteError(w, http.StatusInternalServerError, "could not create session", "session_create_failed", err, logger.Ref("user", uid))
@@ -75,6 +81,27 @@ func (d Deps) handleCreateSession(w http.ResponseWriter, r *http.Request) {
 	}
 	logger.Info("session_create_ok", logger.Ref("user", uid), logger.Ref("session", created.ID))
 	writeJSON(w, http.StatusCreated, created)
+}
+
+// computeMatchRating calculates the Edwards TRIMP-based match rating.
+// It uses the user's birth_year for HRmax (Tanaka formula) or falls back to
+// the session's observed max HR.
+func computeMatchRating(r *http.Request, d Deps, uid string, newSession session.New) *float64 {
+	if newSession.HRMax == nil || len(newSession.Samples) == 0 {
+		return nil
+	}
+	hrMax := *newSession.HRMax
+
+	if d.Profiles != nil {
+		profile, err := d.Profiles.GetOrCreate(r.Context(), uid)
+		if err == nil && profile.BirthYear != nil {
+			if estimated := session.HRmaxByAge(*profile.BirthYear, time.Now().Year()); estimated > hrMax {
+				hrMax = estimated
+			}
+		}
+	}
+
+	return session.CalculateMatchRating(newSession.Samples, hrMax, newSession.DurationS)
 }
 
 // handleListSessions returns the authenticated user's sessions, most recent first.
@@ -178,6 +205,50 @@ func (d Deps) handleUpdateSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	logger.Info("session_update_ok", logger.Ref("user", uid), logger.Ref("session", id))
+	writeJSON(w, http.StatusOK, updated)
+}
+
+// patchSessionRequest is the JSON body accepted by PATCH /v1/sessions/{id}.
+type patchSessionRequest struct {
+	MatchType *string `json:"match_type"`
+	Surface   *string `json:"surface"`
+	Position  *string `json:"position"`
+	Result    *string `json:"result"`
+	Feeling   *int    `json:"feeling"`
+	MatchTag  *string `json:"match_tag"`
+	PitchID   *string `json:"pitch_id"`
+}
+
+func (d Deps) handlePatchSessionContext(w http.ResponseWriter, r *http.Request) {
+	if d.Sessions == nil {
+		logAndWriteError(w, http.StatusServiceUnavailable, "sessions are not available", "session_patch_unavailable", nil)
+		return
+	}
+
+	var req patchSessionRequest
+	if err := decodeJSON(w, r, &req); err != nil {
+		logAndWriteError(w, http.StatusBadRequest, "invalid JSON body", "session_patch_rejected", err, "reason", "invalid_json")
+		return
+	}
+
+	cu, msg := req.validate()
+	if msg != "" {
+		logAndWriteError(w, http.StatusBadRequest, msg, "session_patch_rejected", nil, "reason", "validation_failed")
+		return
+	}
+
+	uid := userID(r.Context())
+	id := r.PathValue("id")
+	updated, err := d.Sessions.UpdateContext(r.Context(), uid, id, cu)
+	if errors.Is(err, session.ErrNotFound) {
+		logAndWriteError(w, http.StatusNotFound, "session not found", "session_patch_not_found", err, logger.Ref("user", uid), logger.Ref("session", id))
+		return
+	}
+	if err != nil {
+		logAndWriteError(w, http.StatusInternalServerError, "could not update session context", "session_patch_failed", err, logger.Ref("user", uid), logger.Ref("session", id))
+		return
+	}
+	logger.Info("session_patch_context_ok", logger.Ref("user", uid), logger.Ref("session", id))
 	writeJSON(w, http.StatusOK, updated)
 }
 
@@ -330,6 +401,57 @@ func (req createSessionRequest) validate() (session.New, string) {
 		HalftimeOffsetS: req.HalftimeOffsetS,
 		Samples:      samples,
 	}, ""
+}
+
+func (req patchSessionRequest) validate() (session.ContextUpdate, string) {
+	if req.Feeling != nil && (*req.Feeling < 1 || *req.Feeling > 5) {
+		return session.ContextUpdate{}, "feeling must be between 1 and 5"
+	}
+	if req.Result != nil && len(*req.Result) > 500 {
+		return session.ContextUpdate{}, "result must be at most 500 characters"
+	}
+
+	cu := session.ContextUpdate{
+		MatchType: req.MatchType,
+		Surface:   req.Surface,
+		Position:  req.Position,
+		Result:    req.Result,
+		Feeling:   req.Feeling,
+		MatchTag:  req.MatchTag,
+		PitchID:   req.PitchID,
+	}
+
+	if cu.MatchType != nil {
+		if !contains(session.ValidMatchTypes, *cu.MatchType) {
+			return session.ContextUpdate{}, "match_type is not a valid value"
+		}
+	}
+	if cu.Surface != nil {
+		if !contains(session.ValidSurfaces, *cu.Surface) {
+			return session.ContextUpdate{}, "surface is not a valid value"
+		}
+	}
+	if cu.Position != nil {
+		if !contains(session.ValidPositions, *cu.Position) {
+			return session.ContextUpdate{}, "position is not a valid value"
+		}
+	}
+	if cu.MatchTag != nil {
+		if !contains(session.ValidMatchTags, *cu.MatchTag) {
+			return session.ContextUpdate{}, "match_tag is not a valid value"
+		}
+	}
+
+	return cu, ""
+}
+
+func contains(list []string, item string) bool {
+	for _, l := range list {
+		if l == item {
+			return true
+		}
+	}
+	return false
 }
 
 // inRangeInt reports whether an optional int is absent or within [min, max].

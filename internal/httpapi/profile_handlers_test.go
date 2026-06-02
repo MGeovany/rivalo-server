@@ -50,6 +50,7 @@ func (f *fakeStore) Update(_ context.Context, id string, u profile.Update) (prof
 		PreferredPosition: u.PreferredPosition,
 		HeightCM:          u.HeightCM,
 		WeightKG:          u.WeightKG,
+		BirthYear:         u.BirthYear,
 	}
 	f.profiles[id] = p
 	return p, nil
@@ -182,6 +183,34 @@ func TestUpdateMe_InvalidHeight_400(t *testing.T) {
 	token := signToken(t, testSecret, "user-7", time.Now().Add(time.Hour))
 	height := 5
 	body := updateProfileRequest{DisplayName: "Leo", HeightCM: &height}
+	rec := doRequest(t, testDeps(newFakeStore()), http.MethodPut, "/v1/me", "Bearer "+token, body)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400", rec.Code)
+	}
+}
+
+func TestUpdateMe_BirthYear_Valid(t *testing.T) {
+	store := newFakeStore()
+	token := signToken(t, testSecret, "user-8", time.Now().Add(time.Hour))
+	by := 1995
+	body := updateProfileRequest{DisplayName: "Vet", BirthYear: &by}
+	rec := doRequest(t, testDeps(store), http.MethodPut, "/v1/me", "Bearer "+token, body)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200; body = %s", rec.Code, rec.Body.String())
+	}
+	var p profile.Profile
+	if err := json.NewDecoder(rec.Body).Decode(&p); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if p.BirthYear == nil || *p.BirthYear != 1995 {
+		t.Errorf("birth_year = %+v, want 1995", p.BirthYear)
+	}
+}
+
+func TestUpdateMe_BirthYear_OutOfRange_400(t *testing.T) {
+	token := signToken(t, testSecret, "user-9", time.Now().Add(time.Hour))
+	by := 1800
+	body := updateProfileRequest{DisplayName: "Old", BirthYear: &by}
 	rec := doRequest(t, testDeps(newFakeStore()), http.MethodPut, "/v1/me", "Bearer "+token, body)
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want 400", rec.Code)

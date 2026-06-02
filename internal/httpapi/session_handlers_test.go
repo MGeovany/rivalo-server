@@ -45,6 +45,7 @@ func (f *fakeSessionStore) Create(_ context.Context, userID string, n session.Ne
 		Source:       n.Source,
 		Mode:         n.Mode,
 		HalftimeOffsetS: n.HalftimeOffsetS,
+		MatchRating:  n.MatchRating,
 		Samples:      n.Samples,
 		CreatedAt:    n.StartedAt,
 	}
@@ -84,6 +85,25 @@ func (f *fakeSessionStore) Update(_ context.Context, userID, id string, u sessio
 			s.Sprints = u.Sprints
 			s.Intensity = u.Intensity
 			s.CaloriesKcal = u.CaloriesKcal
+			f.items[userID][i] = s
+			return s, nil
+		}
+	}
+	return session.Session{}, session.ErrNotFound
+}
+
+func (f *fakeSessionStore) UpdateContext(_ context.Context, userID, id string, cu session.ContextUpdate) (session.Session, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for i, s := range f.items[userID] {
+		if s.ID == id {
+			s.MatchType = cu.MatchType
+			s.Surface = cu.Surface
+			s.Position = cu.Position
+			s.Result = cu.Result
+			s.Feeling = cu.Feeling
+			s.MatchTag = cu.MatchTag
+			s.PitchID = cu.PitchID
 			f.items[userID][i] = s
 			return s, nil
 		}
@@ -317,5 +337,161 @@ func TestGetSession_OwnerAndNotOwner(t *testing.T) {
 	missingRec := doRequest(t, sessionDeps(store), http.MethodGet, "/v1/sessions/nope", "Bearer "+tokenA, nil)
 	if missingRec.Code != http.StatusNotFound {
 		t.Fatalf("missing status = %d, want 404", missingRec.Code)
+	}
+}
+
+func TestPatchSessionContext_Valid(t *testing.T) {
+	store := newFakeSessionStore()
+	token := signToken(t, testSecret, "user-1", time.Now().Add(time.Hour))
+	createRec := doRequest(t, sessionDeps(store), http.MethodPost, "/v1/sessions", "Bearer "+token, validSessionBody())
+	var created session.Session
+	if err := json.NewDecoder(createRec.Body).Decode(&created); err != nil {
+		t.Fatalf("decode create: %v", err)
+	}
+
+	mt := "11-a-side"
+	sf := "Natural grass"
+	pos := "Midfielder"
+	res := "Won 3-1"
+	feel := 4
+	tag := "league"
+	body := patchSessionRequest{
+		MatchType: &mt, Surface: &sf, Position: &pos,
+		Result: &res, Feeling: &feel, MatchTag: &tag,
+	}
+
+	rec := doRequest(t, sessionDeps(store), http.MethodPatch, "/v1/sessions/"+created.ID, "Bearer "+token, body)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200; body = %s", rec.Code, rec.Body.String())
+	}
+	var updated session.Session
+	if err := json.NewDecoder(rec.Body).Decode(&updated); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if updated.MatchType == nil || *updated.MatchType != "11-a-side" {
+		t.Errorf("match_type not persisted: %+v", updated.MatchType)
+	}
+	if updated.Feeling == nil || *updated.Feeling != 4 {
+		t.Errorf("feeling not persisted: %+v", updated.Feeling)
+	}
+	if updated.Result == nil || *updated.Result != "Won 3-1" {
+		t.Errorf("result not persisted: %+v", updated.Result)
+	}
+	// Metrics unchanged.
+	if updated.DistanceM != 8200 {
+		t.Errorf("distance_m changed: %f", updated.DistanceM)
+	}
+}
+
+func TestPatchSessionContext_InvalidEnum_400(t *testing.T) {
+	store := newFakeSessionStore()
+	token := signToken(t, testSecret, "user-1", time.Now().Add(time.Hour))
+	createRec := doRequest(t, sessionDeps(store), http.MethodPost, "/v1/sessions", "Bearer "+token, validSessionBody())
+	var created session.Session
+	_ = json.NewDecoder(createRec.Body).Decode(&created)
+
+	bad := "invalid-surface"
+	body := patchSessionRequest{Surface: &bad}
+	rec := doRequest(t, sessionDeps(store), http.MethodPatch, "/v1/sessions/"+created.ID, "Bearer "+token, body)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400", rec.Code)
+	}
+}
+
+func TestPatchSessionContext_FeelingOutOfRange_400(t *testing.T) {
+	store := newFakeSessionStore()
+	token := signToken(t, testSecret, "user-1", time.Now().Add(time.Hour))
+	createRec := doRequest(t, sessionDeps(store), http.MethodPost, "/v1/sessions", "Bearer "+token, validSessionBody())
+	var created session.Session
+	_ = json.NewDecoder(createRec.Body).Decode(&created)
+
+	feel := 99
+	body := patchSessionRequest{Feeling: &feel}
+	rec := doRequest(t, sessionDeps(store), http.MethodPatch, "/v1/sessions/"+created.ID, "Bearer "+token, body)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400", rec.Code)
+	}
+}
+
+func TestPatchSessionContext_NonOwner_404(t *testing.T) {
+	store := newFakeSessionStore()
+	tokenA := signToken(t, testSecret, "user-a", time.Now().Add(time.Hour))
+	tokenB := signToken(t, testSecret, "user-b", time.Now().Add(time.Hour))
+	createRec := doRequest(t, sessionDeps(store), http.MethodPost, "/v1/sessions", "Bearer "+tokenA, validSessionBody())
+	var created session.Session
+	_ = json.NewDecoder(createRec.Body).Decode(&created)
+
+	mt := "5-a-side"
+	body := patchSessionRequest{MatchType: &mt}
+	rec := doRequest(t, sessionDeps(store), http.MethodPatch, "/v1/sessions/"+created.ID, "Bearer "+tokenB, body)
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, want 404", rec.Code)
+	}
+}
+
+func TestPatchSessionContext_PartialUpdate(t *testing.T) {
+	store := newFakeSessionStore()
+	token := signToken(t, testSecret, "user-1", time.Now().Add(time.Hour))
+	createRec := doRequest(t, sessionDeps(store), http.MethodPost, "/v1/sessions", "Bearer "+token, validSessionBody())
+	var created session.Session
+	_ = json.NewDecoder(createRec.Body).Decode(&created)
+
+	// Only set one field; others stay nil.
+	res := "2-2 draw"
+	body := patchSessionRequest{Result: &res}
+	rec := doRequest(t, sessionDeps(store), http.MethodPatch, "/v1/sessions/"+created.ID, "Bearer "+token, body)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+	var updated session.Session
+	if err := json.NewDecoder(rec.Body).Decode(&updated); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if updated.Result == nil || *updated.Result != "2-2 draw" {
+		t.Errorf("result not persisted: %+v", updated.Result)
+	}
+	if updated.MatchType != nil {
+		t.Errorf("match_type unexpectedly set: %+v", updated.MatchType)
+	}
+}
+
+func TestCreateSession_MatchRating_NoHR_NoSamples(t *testing.T) {
+	store := newFakeSessionStore()
+	token := signToken(t, testSecret, "user-1", time.Now().Add(time.Hour))
+	rec := doRequest(t, sessionDeps(store), http.MethodPost, "/v1/sessions", "Bearer "+token, validSessionBody())
+	var created session.Session
+	if err := json.NewDecoder(rec.Body).Decode(&created); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if created.MatchRating != nil {
+		t.Errorf("match_rating should be nil without HR samples, got %v", *created.MatchRating)
+	}
+}
+
+func TestCreateSession_MatchRating_Computed(t *testing.T) {
+	store := newFakeSessionStore()
+	token := signToken(t, testSecret, "user-1", time.Now().Add(time.Hour))
+	hr := 150
+	hrMax := 190
+	body := validSessionBody()
+	body.HRMax = &hrMax
+	body.Samples = []sampleRequest{
+		{TOffsetS: 0, HR: &hr},
+		{TOffsetS: 60, HR: &hr},
+		{TOffsetS: 120, HR: &hr},
+	}
+	rec := doRequest(t, sessionDeps(store), http.MethodPost, "/v1/sessions", "Bearer "+token, body)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want 201; body = %s", rec.Code, rec.Body.String())
+	}
+	var created session.Session
+	if err := json.NewDecoder(rec.Body).Decode(&created); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if created.MatchRating == nil {
+		t.Fatal("match_rating should not be nil")
+	}
+	if *created.MatchRating < 0 || *created.MatchRating > 100 {
+		t.Errorf("match_rating out of 0–100 range: %f", *created.MatchRating)
 	}
 }

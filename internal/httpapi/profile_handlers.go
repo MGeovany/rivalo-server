@@ -14,6 +14,7 @@ type updateProfileRequest struct {
 	PreferredPosition *string  `json:"preferred_position"`
 	HeightCM          *int     `json:"height_cm"`
 	WeightKG          *float64 `json:"weight_kg"`
+	BirthYear         *int     `json:"birth_year"`
 }
 
 // handleGetMe returns the authenticated user's profile, creating it on first access.
@@ -120,6 +121,14 @@ func (req updateProfileRequest) validate() (profile.Update, string) {
 			return profile.Update{}, "weight_kg must be between 20 and 400"
 		}
 		update.WeightKG = req.WeightKG
+	}
+
+	if req.BirthYear != nil {
+		year := *req.BirthYear
+		if year < 1900 || year > 2020 {
+			return profile.Update{}, "birth_year must be between 1900 and 2020"
+		}
+		update.BirthYear = &year
 	}
 
 	return update, ""
