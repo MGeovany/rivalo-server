@@ -278,6 +278,7 @@ type patchSessionRequest struct {
 	Result    *string `json:"result"`
 	Feeling   *int    `json:"feeling"`
 	MatchTag  *string `json:"match_tag"`
+	Opponent  *string `json:"opponent"`
 	PitchID   *string `json:"pitch_id"`
 }
 
@@ -506,6 +507,9 @@ func (req patchSessionRequest) validate() (session.ContextUpdate, string) {
 	if req.Result != nil && len(*req.Result) > 500 {
 		return session.ContextUpdate{}, "result must be at most 500 characters"
 	}
+	if req.Opponent != nil && len(*req.Opponent) > 120 {
+		return session.ContextUpdate{}, "opponent must be at most 120 characters"
+	}
 
 	cu := session.ContextUpdate{
 		MatchType: req.MatchType,
@@ -514,6 +518,7 @@ func (req patchSessionRequest) validate() (session.ContextUpdate, string) {
 		Result:    req.Result,
 		Feeling:   req.Feeling,
 		MatchTag:  req.MatchTag,
+		Opponent:  req.Opponent,
 		PitchID:   req.PitchID,
 	}
 

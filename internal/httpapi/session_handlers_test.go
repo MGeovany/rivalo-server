@@ -105,6 +105,7 @@ func (f *fakeSessionStore) UpdateContext(_ context.Context, userID, id string, c
 			s.Result = cu.Result
 			s.Feeling = cu.Feeling
 			s.MatchTag = cu.MatchTag
+			s.Opponent = cu.Opponent
 			s.PitchID = cu.PitchID
 			f.items[userID][i] = s
 			return s, nil

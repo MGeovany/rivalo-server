@@ -95,6 +95,7 @@ type Session struct {
 	Result        *string  `json:"result,omitempty"`
 	Feeling       *int     `json:"feeling,omitempty"`
 	MatchTag      *string  `json:"match_tag,omitempty"`
+	Opponent      *string  `json:"opponent,omitempty"`
 	PitchID       *string  `json:"pitch_id,omitempty"`
 	MatchRating   *float64 `json:"match_rating,omitempty"`
 	CreatedAt     time.Time `json:"created_at"`
@@ -232,5 +233,6 @@ type ContextUpdate struct {
 	Result    *string
 	Feeling   *int
 	MatchTag  *string
+	Opponent  *string
 	PitchID   *string
 }

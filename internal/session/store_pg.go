@@ -22,7 +22,7 @@ func NewPostgresStore(pool *pgxpool.Pool) *PostgresStore {
 const sessionColumns = `id, user_id, started_at, ended_at, duration_s, distance_m,
 	hr_avg, hr_max, speed_max_kmh, sprints, intensity, calories_kcal, source,
 	mode, halftime_offset_s, match_type, surface, position, result, feeling,
-	match_tag, pitch_id, match_rating, created_at`
+	match_tag, pitch_id, match_rating, created_at, opponent`
 
 func (s *PostgresStore) Create(ctx context.Context, userID string, n New) (Session, error) {
 	const query = `
@@ -174,13 +174,13 @@ func (s *PostgresStore) UpdateContext(ctx context.Context, userID, id string, cu
 	const query = `
 		update public.sessions set
 			match_type = $3, surface = $4, position = $5, result = $6,
-			feeling = $7, match_tag = $8, pitch_id = $9
+			feeling = $7, match_tag = $8, pitch_id = $9, opponent = $10
 		where id = $1 and user_id = $2
 		returning ` + sessionColumns
 
 	sess, err := scanSession(s.pool.QueryRow(ctx, query,
 		id, userID, cu.MatchType, cu.Surface, cu.Position, cu.Result,
-		cu.Feeling, cu.MatchTag, cu.PitchID,
+		cu.Feeling, cu.MatchTag, cu.PitchID, cu.Opponent,
 	))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Session{}, ErrNotFound
@@ -510,7 +510,7 @@ func scanSession(r scanRow) (Session, error) {
 		&s.HRAvg, &s.HRMax, &s.SpeedMaxKMH, &s.Sprints, &s.Intensity, &s.CaloriesKcal,
 		&s.Source, &s.Mode, &s.HalftimeOffsetS,
 		&s.MatchType, &s.Surface, &s.Position, &s.Result, &s.Feeling,
-		&s.MatchTag, &s.PitchID, &s.MatchRating, &s.CreatedAt,
+		&s.MatchTag, &s.PitchID, &s.MatchRating, &s.CreatedAt, &s.Opponent,
 	)
 	return s, err
 }

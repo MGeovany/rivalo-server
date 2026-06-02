@@ -1,6 +1,7 @@
-h1:LhDRuYKMe6RzAKt8IABVo99QveCb+KQzrEoiSRPW3dY=
+h1:TbQTH4uIR4+dxyviiLN6m4n+CAbK4n8JisH5ZCCvC6I=
 20260601000001_init_profiles.sql h1:KJnCzU5uPFz5wVW0u04c8tSOSs1rBBC9fsWDgi6nzLI=
 20260601000002_add_sessions.sql h1:jHWWRC7uycyjrjDG/z97XhNwCDGMoDVYqt00t1sB2Pw=
 20260601000003_add_session_samples.sql h1:Tv7g4wLVJgvFn9nXkOlFburm7IPNbJCqL7/LYkjke3k=
 20260601000004_v2_foundations.sql h1:72LgbDRuxNE3+ZJtNO51lg3WWeBPz1yKejpk/xDIOkI=
 20260602000001_player_card_storage.sql h1:9zS2w+3VZpGl0O3h0NAhZlxEjFmO8TWE6svIsSrRaKg=
+20260602000002_add_opponent.sql h1:Z1m3baWJ5tl8Jv/5rbFs8A9m/+v9ZhZnkeIvtX8+s1A=
