@@ -565,6 +565,24 @@ func (s *PostgresStore) GetWeeklyRecap(ctx context.Context, userID string) (Week
 	return BuildWeeklyRecap(list, time.Now().UTC()), nil
 }
 
+func (s *PostgresStore) GetBadgeMetrics(ctx context.Context, userID string) (BadgeMetrics, error) {
+	const query = `
+		select count(*)::int,
+			coalesce(max(distance_m), 0),
+			coalesce(max(sprints), 0),
+			coalesce(max(match_rating), 0)
+		from public.sessions
+		where user_id = $1`
+	var m BadgeMetrics
+	err := s.pool.QueryRow(ctx, query, userID).Scan(
+		&m.MatchCount, &m.BestDistanceM, &m.BestSprints, &m.BestRating,
+	)
+	if err != nil {
+		return BadgeMetrics{}, err
+	}
+	return m, nil
+}
+
 func (s *PostgresStore) loadSamples(ctx context.Context, sessionID string) ([]Sample, error) {
 	const query = `
 		select t_offset_s, hr, speed_kmh, half

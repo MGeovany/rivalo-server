@@ -410,6 +410,25 @@ func (f *fakeSessionStore) GetStreaks(_ context.Context, userID string) (session
 	return session.BuildStreaks(list, time.Now().UTC()), nil
 }
 
+func (f *fakeSessionStore) GetBadgeMetrics(_ context.Context, userID string) (session.BadgeMetrics, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	var m session.BadgeMetrics
+	for _, s := range f.items[userID] {
+		m.MatchCount++
+		if s.DistanceM > m.BestDistanceM {
+			m.BestDistanceM = s.DistanceM
+		}
+		if s.Sprints > m.BestSprints {
+			m.BestSprints = s.Sprints
+		}
+		if s.MatchRating != nil && *s.MatchRating > m.BestRating {
+			m.BestRating = *s.MatchRating
+		}
+	}
+	return m, nil
+}
+
 func (f *fakeSessionStore) GetWeeklyRecap(_ context.Context, userID string) (session.WeeklyRecap, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()

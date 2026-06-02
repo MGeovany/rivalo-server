@@ -234,6 +234,16 @@ type Store interface {
 	GetPitchStats(ctx context.Context, userID, pitchID string) (PitchStats, error)
 	// GetWeeklyRecap summarizes the current ISO week vs the previous one.
 	GetWeeklyRecap(ctx context.Context, userID string) (WeeklyRecap, error)
+	// GetBadgeMetrics returns the aggregate bests used to evaluate badges.
+	GetBadgeMetrics(ctx context.Context, userID string) (BadgeMetrics, error)
+}
+
+// BadgeMetrics are session-derived aggregates for badge evaluation.
+type BadgeMetrics struct {
+	MatchCount    int
+	BestDistanceM float64
+	BestSprints   int
+	BestRating    float64
 }
 
 // PitchStats aggregates a user's sessions at a single pitch.

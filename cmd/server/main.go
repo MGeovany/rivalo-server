@@ -24,10 +24,12 @@ import (
 	"time"
 
 	"github.com/MGeovany/rivalo-server/internal/auth"
+	"github.com/MGeovany/rivalo-server/internal/badge"
 	"github.com/MGeovany/rivalo-server/internal/config"
 	"github.com/MGeovany/rivalo-server/internal/db"
 	"github.com/MGeovany/rivalo-server/internal/httpapi"
 	"github.com/MGeovany/rivalo-server/internal/logger"
+	"github.com/MGeovany/rivalo-server/internal/pitch"
 	"github.com/MGeovany/rivalo-server/internal/profile"
 	"github.com/MGeovany/rivalo-server/internal/session"
 )
@@ -49,6 +51,8 @@ func run() error {
 	var pinger httpapi.Pinger
 	var profiles profile.Store
 	var sessions session.Store
+	var pitches pitch.Store
+	var badges badge.Store
 	if cfg.DatabaseURL != "" {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
@@ -62,6 +66,8 @@ func run() error {
 		pinger = database
 		profiles = profile.NewPostgresStore(database.Pool)
 		sessions = session.NewPostgresStore(database.Pool)
+		pitches = pitch.NewPostgresStore(database.Pool)
+		badges = badge.NewPostgresStore(database.Pool)
 		logger.Info("database_ready")
 	} else {
 		logger.Warn("database_disabled")
@@ -76,6 +82,8 @@ func run() error {
 			DB:       pinger,
 			Profiles: profiles,
 			Sessions: sessions,
+			Pitches:  pitches,
+			Badges:   badges,
 			Verifier: verifier,
 		}),
 		ReadHeaderTimeout: 5 * time.Second,
