@@ -277,9 +277,15 @@ type patchSessionRequest struct {
 	Position  *string `json:"position"`
 	Result    *string `json:"result"`
 	Feeling   *int    `json:"feeling"`
-	MatchTag  *string `json:"match_tag"`
-	Opponent  *string `json:"opponent"`
-	PitchID   *string `json:"pitch_id"`
+	MatchTag    *string `json:"match_tag"`
+	Opponent    *string `json:"opponent"`
+	Outcome     *string `json:"outcome"`
+	Score       *string `json:"score"`
+	Competition *string `json:"competition"`
+	Goals       *int    `json:"goals"`
+	Assists     *int    `json:"assists"`
+	Notes       *string `json:"notes"`
+	PitchID     *string `json:"pitch_id"`
 }
 
 func (d Deps) handlePatchSessionContext(w http.ResponseWriter, r *http.Request) {
@@ -510,16 +516,34 @@ func (req patchSessionRequest) validate() (session.ContextUpdate, string) {
 	if req.Opponent != nil && len(*req.Opponent) > 120 {
 		return session.ContextUpdate{}, "opponent must be at most 120 characters"
 	}
+	if req.Score != nil && len(*req.Score) > 20 {
+		return session.ContextUpdate{}, "score must be at most 20 characters"
+	}
+	if req.Notes != nil && len(*req.Notes) > 500 {
+		return session.ContextUpdate{}, "notes must be at most 500 characters"
+	}
+	if req.Goals != nil && *req.Goals < 0 {
+		return session.ContextUpdate{}, "goals must be zero or positive"
+	}
+	if req.Assists != nil && *req.Assists < 0 {
+		return session.ContextUpdate{}, "assists must be zero or positive"
+	}
 
 	cu := session.ContextUpdate{
-		MatchType: req.MatchType,
-		Surface:   req.Surface,
-		Position:  req.Position,
-		Result:    req.Result,
-		Feeling:   req.Feeling,
-		MatchTag:  req.MatchTag,
-		Opponent:  req.Opponent,
-		PitchID:   req.PitchID,
+		MatchType:   req.MatchType,
+		Surface:     req.Surface,
+		Position:    req.Position,
+		Result:      req.Result,
+		Feeling:     req.Feeling,
+		MatchTag:    req.MatchTag,
+		Opponent:    req.Opponent,
+		Outcome:     req.Outcome,
+		Score:       req.Score,
+		Competition: req.Competition,
+		Goals:       req.Goals,
+		Assists:     req.Assists,
+		Notes:       req.Notes,
+		PitchID:     req.PitchID,
 	}
 
 	if cu.MatchType != nil {
@@ -540,6 +564,16 @@ func (req patchSessionRequest) validate() (session.ContextUpdate, string) {
 	if cu.MatchTag != nil {
 		if !contains(session.ValidMatchTags, *cu.MatchTag) {
 			return session.ContextUpdate{}, "match_tag is not a valid value"
+		}
+	}
+	if cu.Outcome != nil {
+		if !contains(session.ValidOutcomes, *cu.Outcome) {
+			return session.ContextUpdate{}, "outcome is not a valid value"
+		}
+	}
+	if cu.Competition != nil {
+		if !contains(session.ValidCompetitions, *cu.Competition) {
+			return session.ContextUpdate{}, "competition is not a valid value"
 		}
 	}
 

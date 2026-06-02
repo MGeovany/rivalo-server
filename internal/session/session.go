@@ -48,7 +48,19 @@ const (
 	MatchTagFriendly = "friendly"
 	MatchTagLeague   = "league"
 	MatchTagTraining = "training"
+
+	// V3 structured result.
+	OutcomeWin  = "win"
+	OutcomeDraw = "draw"
+	OutcomeLoss = "loss"
+
+	CompetitionFriendly   = "friendly"
+	CompetitionLeague     = "league"
+	CompetitionTournament = "tournament"
 )
+
+var ValidOutcomes = []string{OutcomeWin, OutcomeDraw, OutcomeLoss}
+var ValidCompetitions = []string{CompetitionFriendly, CompetitionLeague, CompetitionTournament}
 
 var ValidMatchTypes = []string{MatchType5aside, MatchType7aside, MatchType9aside, MatchType11aside, MatchTypeOther}
 var ValidSurfaces = []string{SurfaceNaturalGrass, SurfaceArtificialTurf, SurfaceIndoor, SurfaceConcrete, SurfaceOther}
@@ -96,6 +108,13 @@ type Session struct {
 	Feeling       *int     `json:"feeling,omitempty"`
 	MatchTag      *string  `json:"match_tag,omitempty"`
 	Opponent      *string  `json:"opponent,omitempty"`
+	// V3 structured result (post-match, optional).
+	Outcome       *string  `json:"outcome,omitempty"`
+	Score         *string  `json:"score,omitempty"`
+	Competition   *string  `json:"competition,omitempty"`
+	Goals         *int     `json:"goals,omitempty"`
+	Assists       *int     `json:"assists,omitempty"`
+	Notes         *string  `json:"notes,omitempty"`
 	PitchID       *string  `json:"pitch_id,omitempty"`
 	MatchRating   *float64 `json:"match_rating,omitempty"`
 	CreatedAt     time.Time `json:"created_at"`
@@ -230,9 +249,15 @@ type ContextUpdate struct {
 	MatchType *string
 	Surface   *string
 	Position  *string
-	Result    *string
-	Feeling   *int
-	MatchTag  *string
-	Opponent  *string
-	PitchID   *string
+	Result      *string
+	Feeling     *int
+	MatchTag    *string
+	Opponent    *string
+	Outcome     *string
+	Score       *string
+	Competition *string
+	Goals       *int
+	Assists     *int
+	Notes       *string
+	PitchID     *string
 }

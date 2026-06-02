@@ -106,6 +106,12 @@ func (f *fakeSessionStore) UpdateContext(_ context.Context, userID, id string, c
 			s.Feeling = cu.Feeling
 			s.MatchTag = cu.MatchTag
 			s.Opponent = cu.Opponent
+			s.Outcome = cu.Outcome
+			s.Score = cu.Score
+			s.Competition = cu.Competition
+			s.Goals = cu.Goals
+			s.Assists = cu.Assists
+			s.Notes = cu.Notes
 			s.PitchID = cu.PitchID
 			f.items[userID][i] = s
 			return s, nil
@@ -658,6 +664,87 @@ func TestPatchSessionContext_Valid(t *testing.T) {
 	// Metrics unchanged.
 	if updated.DistanceM != 8200 {
 		t.Errorf("distance_m changed: %f", updated.DistanceM)
+	}
+}
+
+func TestPatchSessionContext_StructuredResult_RoundTrip(t *testing.T) {
+	store := newFakeSessionStore()
+	token := signToken(t, testSecret, "user-1", time.Now().Add(time.Hour))
+	createRec := doRequest(t, sessionDeps(store), http.MethodPost, "/v1/sessions", "Bearer "+token, validSessionBody())
+	var created session.Session
+	_ = json.NewDecoder(createRec.Body).Decode(&created)
+
+	outcome := "win"
+	score := "3-1"
+	opp := "Los Tigres"
+	comp := "league"
+	goals := 2
+	assists := 1
+	notes := "Great second half"
+	body := patchSessionRequest{
+		Outcome: &outcome, Score: &score, Opponent: &opp,
+		Competition: &comp, Goals: &goals, Assists: &assists, Notes: &notes,
+	}
+
+	rec := doRequest(t, sessionDeps(store), http.MethodPatch, "/v1/sessions/"+created.ID, "Bearer "+token, body)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200; body = %s", rec.Code, rec.Body.String())
+	}
+	var updated session.Session
+	if err := json.NewDecoder(rec.Body).Decode(&updated); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if updated.Outcome == nil || *updated.Outcome != "win" {
+		t.Errorf("outcome not persisted: %+v", updated.Outcome)
+	}
+	if updated.Score == nil || *updated.Score != "3-1" {
+		t.Errorf("score not persisted: %+v", updated.Score)
+	}
+	if updated.Opponent == nil || *updated.Opponent != "Los Tigres" {
+		t.Errorf("opponent not persisted: %+v", updated.Opponent)
+	}
+	if updated.Competition == nil || *updated.Competition != "league" {
+		t.Errorf("competition not persisted: %+v", updated.Competition)
+	}
+	if updated.Goals == nil || *updated.Goals != 2 {
+		t.Errorf("goals not persisted: %+v", updated.Goals)
+	}
+	if updated.Assists == nil || *updated.Assists != 1 {
+		t.Errorf("assists not persisted: %+v", updated.Assists)
+	}
+	// Metrics unchanged.
+	if updated.DistanceM != 8200 {
+		t.Errorf("distance_m changed: %f", updated.DistanceM)
+	}
+}
+
+func TestPatchSessionContext_InvalidOutcome_400(t *testing.T) {
+	store := newFakeSessionStore()
+	token := signToken(t, testSecret, "user-1", time.Now().Add(time.Hour))
+	createRec := doRequest(t, sessionDeps(store), http.MethodPost, "/v1/sessions", "Bearer "+token, validSessionBody())
+	var created session.Session
+	_ = json.NewDecoder(createRec.Body).Decode(&created)
+
+	bad := "tie"
+	body := patchSessionRequest{Outcome: &bad}
+	rec := doRequest(t, sessionDeps(store), http.MethodPatch, "/v1/sessions/"+created.ID, "Bearer "+token, body)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400", rec.Code)
+	}
+}
+
+func TestPatchSessionContext_NegativeGoals_400(t *testing.T) {
+	store := newFakeSessionStore()
+	token := signToken(t, testSecret, "user-1", time.Now().Add(time.Hour))
+	createRec := doRequest(t, sessionDeps(store), http.MethodPost, "/v1/sessions", "Bearer "+token, validSessionBody())
+	var created session.Session
+	_ = json.NewDecoder(createRec.Body).Decode(&created)
+
+	g := -1
+	body := patchSessionRequest{Goals: &g}
+	rec := doRequest(t, sessionDeps(store), http.MethodPatch, "/v1/sessions/"+created.ID, "Bearer "+token, body)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400", rec.Code)
 	}
 }
 

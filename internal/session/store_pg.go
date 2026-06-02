@@ -22,7 +22,8 @@ func NewPostgresStore(pool *pgxpool.Pool) *PostgresStore {
 const sessionColumns = `id, user_id, started_at, ended_at, duration_s, distance_m,
 	hr_avg, hr_max, speed_max_kmh, sprints, intensity, calories_kcal, source,
 	mode, halftime_offset_s, match_type, surface, position, result, feeling,
-	match_tag, pitch_id, match_rating, created_at, opponent`
+	match_tag, pitch_id, match_rating, created_at, opponent,
+	outcome, score, competition, goals, assists, notes`
 
 func (s *PostgresStore) Create(ctx context.Context, userID string, n New) (Session, error) {
 	const query = `
@@ -174,13 +175,16 @@ func (s *PostgresStore) UpdateContext(ctx context.Context, userID, id string, cu
 	const query = `
 		update public.sessions set
 			match_type = $3, surface = $4, position = $5, result = $6,
-			feeling = $7, match_tag = $8, pitch_id = $9, opponent = $10
+			feeling = $7, match_tag = $8, pitch_id = $9, opponent = $10,
+			outcome = $11, score = $12, competition = $13, goals = $14,
+			assists = $15, notes = $16
 		where id = $1 and user_id = $2
 		returning ` + sessionColumns
 
 	sess, err := scanSession(s.pool.QueryRow(ctx, query,
 		id, userID, cu.MatchType, cu.Surface, cu.Position, cu.Result,
 		cu.Feeling, cu.MatchTag, cu.PitchID, cu.Opponent,
+		cu.Outcome, cu.Score, cu.Competition, cu.Goals, cu.Assists, cu.Notes,
 	))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Session{}, ErrNotFound
@@ -511,6 +515,7 @@ func scanSession(r scanRow) (Session, error) {
 		&s.Source, &s.Mode, &s.HalftimeOffsetS,
 		&s.MatchType, &s.Surface, &s.Position, &s.Result, &s.Feeling,
 		&s.MatchTag, &s.PitchID, &s.MatchRating, &s.CreatedAt, &s.Opponent,
+		&s.Outcome, &s.Score, &s.Competition, &s.Goals, &s.Assists, &s.Notes,
 	)
 	return s, err
 }

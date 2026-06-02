@@ -337,8 +337,9 @@ func seedSessions(ctx context.Context, pool *pgxpool.Pool, userID string) (int, 
 			id, user_id, started_at, ended_at, duration_s, distance_m,
 			hr_avg, hr_max, speed_max_kmh, sprints, intensity, calories_kcal, source,
 			mode, match_type, halftime_offset_s, match_rating, position, surface, match_tag,
-			feeling, result, opponent, pitch_id
-		) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24)`
+			feeling, result, opponent, pitch_id,
+			outcome, score, competition, goals, assists
+		) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29)`
 
 	now := time.Now().UTC()
 	for i, m := range matches {
@@ -354,11 +355,23 @@ func seedSessions(ctx context.Context, pool *pgxpool.Pool, userID string) (int, 
 			halftimeS = &hs
 		}
 
+		// Derive the structured result from the legacy "3-1 W" string.
+		outcome, score := parseResult(m.result)
+		var goals, assists *int
+		competition := deriveCompetition(m.matchTag, i)
+		if outcome != "" {
+			g := i % 3
+			a := (i + 1) % 2
+			goals = &g
+			assists = &a
+		}
+
 		if _, err := tx.Exec(ctx, insertSession,
 			id, userID, start, end, durationS, m.distanceM,
 			m.hrAvg, m.hrMax, m.speedMax, m.sprints, m.intensity, m.calories, "watch",
 			m.mode, m.matchType, halftimeS, ptrFloat(m.rating), m.position, m.surface, m.matchTag,
 			m.feeling, nilIfEmpty(m.result), nilIfEmpty(m.opponent), demoPitchIDs[m.pitchIdx],
+			nilIfEmpty(outcome), nilIfEmpty(score), nilIfEmpty(competition), goals, assists,
 		); err != nil {
 			return 0, err
 		}
@@ -423,6 +436,41 @@ func nilIfEmpty(s string) *string {
 		return nil
 	}
 	return &s
+}
+
+// parseResult turns a legacy "3-1 W" string into (outcome, score). Empty input
+// yields empty strings.
+func parseResult(result string) (outcome, score string) {
+	parts := strings.Fields(result)
+	if len(parts) < 2 {
+		return "", ""
+	}
+	score = parts[0]
+	switch parts[1] {
+	case "W":
+		outcome = "win"
+	case "D":
+		outcome = "draw"
+	case "L":
+		outcome = "loss"
+	}
+	return outcome, score
+}
+
+// deriveCompetition maps the legacy match_tag to a V3 competition, promoting a
+// few league matches to "tournament" so the seed exercises all enum values.
+func deriveCompetition(matchTag string, index int) string {
+	switch matchTag {
+	case "friendly":
+		return "friendly"
+	case "league":
+		if index%4 == 0 {
+			return "tournament"
+		}
+		return "league"
+	default:
+		return ""
+	}
 }
 
 func ptrFloat(v float64) *float64 {
