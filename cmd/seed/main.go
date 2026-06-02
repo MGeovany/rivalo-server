@@ -30,17 +30,25 @@ const (
 	demoPassword = "Rivalo@123"
 )
 
-var demoSessionIDs = [5]string{
-	"a1000001-0000-4000-8000-000000000001",
-	"a1000001-0000-4000-8000-000000000002",
-	"a1000001-0000-4000-8000-000000000003",
-	"a1000001-0000-4000-8000-000000000004",
-	"a1000001-0000-4000-8000-000000000005",
+// Pitches seeded for the demo user; sessions reference these by index.
+var demoPitchIDs = [3]string{
+	"b2000002-0000-4000-8000-000000000001",
+	"b2000002-0000-4000-8000-000000000002",
+	"b2000002-0000-4000-8000-000000000003",
+}
+
+type demoPitch struct {
+	id                   string
+	name                 string
+	pType                string
+	surface              string
+	lengthM              float64
+	widthM               float64
+	measurementMethod    string
+	latOffset, lonOffset float64
 }
 
 type demoMatch struct {
-	id          string
-	index       int
 	daysAgo     int
 	durationMin int
 	distanceM   float64
@@ -52,8 +60,40 @@ type demoMatch struct {
 	calories    float64
 	mode        string
 	matchType   string
-	halftimeS   *int
-	matchRating *float64
+	surface     string
+	position    string
+	matchTag    string
+	result      string
+	feeling     int
+	opponent    string
+	pitchIdx    int
+	structured  bool
+	rating      float64
+}
+
+// demoSessionID derives a deterministic UUID for the i-th seeded session.
+func demoSessionID(i int) string {
+	return fmt.Sprintf("a1000001-0000-4000-8000-%012d", i+1)
+}
+
+// positionXBias biases the heatmap toward the area a position usually occupies.
+func positionXBias(position string) float64 {
+	switch position {
+	case "Goalkeeper":
+		return -0.34
+	case "Defender":
+		return -0.22
+	case "Full-back":
+		return -0.12
+	case "Midfielder":
+		return 0
+	case "Winger":
+		return 0.12
+	case "Forward":
+		return 0.22
+	default:
+		return 0
+	}
 }
 
 func main() {
