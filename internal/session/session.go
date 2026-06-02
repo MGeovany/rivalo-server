@@ -104,6 +104,9 @@ type Session struct {
 	Path []PathPoint `json:"path,omitempty"`
 	// FatigueDrop is computed on-read for structured sessions; nil otherwise.
 	FatigueDrop *FatigueDrop `json:"fatigue_drop,omitempty"`
+	// NewRecords lists the personal-best metrics this session broke. Populated
+	// only on the create response when the user already had prior history.
+	NewRecords []string `json:"new_records,omitempty"`
 }
 
 // New carries the fields needed to create a session.
@@ -174,6 +177,16 @@ type SessionInsights struct {
 	ByMatchType []ContextGroup         `json:"by_match_type"`
 	BySurface   []ContextGroup         `json:"by_surface"`
 	ByPosition  []ContextGroup         `json:"by_position"`
+	// Insights are rule-based, explainable statements derived from the data
+	// above. Empty below the minimum-sessions threshold (see BuildInsights).
+	Insights []Insight `json:"insights"`
+}
+
+// Insight is one explainable, rule-based observation (no AI/ML).
+type Insight struct {
+	Kind   string `json:"kind"`
+	Title  string `json:"title"`
+	Detail string `json:"detail"`
 }
 
 // Store persists sport sessions.

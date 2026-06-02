@@ -329,6 +329,7 @@ func (f *fakeSessionStore) GetInsights(_ context.Context, userID string) (sessio
 	ins.ByMatchType = ctxGroup("match_type")
 	ins.BySurface = ctxGroup("surface")
 	ins.ByPosition = ctxGroup("position")
+	ins.Insights = session.BuildInsights(ins, ins.Averages.MatchRating)
 	return ins, nil
 }
 

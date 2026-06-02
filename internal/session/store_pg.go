@@ -399,6 +399,21 @@ func (s *PostgresStore) GetInsights(ctx context.Context, userID string) (Session
 	if err != nil {
 		return SessionInsights{}, err
 	}
+
+	// Recent Match Rating average (last 5 sessions) for the trend insight.
+	const recentRatingQuery = `
+		select avg(match_rating) from (
+			select match_rating from public.sessions
+			where user_id = $1 and match_rating is not null
+			order by started_at desc
+			limit 5
+		) recent`
+	var recentRating *float64
+	if err := s.pool.QueryRow(ctx, recentRatingQuery, userID).Scan(&recentRating); err != nil {
+		return SessionInsights{}, err
+	}
+
+	ins.Insights = BuildInsights(ins, recentRating)
 	return ins, nil
 }
 
