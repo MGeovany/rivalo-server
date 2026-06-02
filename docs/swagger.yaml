@@ -1,5 +1,30 @@
 basePath: /
 definitions:
+  httpapi.createSessionRequest:
+    properties:
+      calories_kcal:
+        type: number
+      distance_m:
+        type: number
+      duration_s:
+        type: integer
+      ended_at:
+        type: string
+      hr_avg:
+        type: integer
+      hr_max:
+        type: integer
+      intensity:
+        type: number
+      source:
+        type: string
+      speed_max_kmh:
+        type: number
+      sprints:
+        type: integer
+      started_at:
+        type: string
+    type: object
   httpapi.errorResponse:
     properties:
       error:
@@ -39,6 +64,37 @@ definitions:
         type: string
       weight_kg:
         type: number
+    type: object
+  session.Session:
+    properties:
+      calories_kcal:
+        type: number
+      created_at:
+        type: string
+      distance_m:
+        type: number
+      duration_s:
+        type: integer
+      ended_at:
+        type: string
+      hr_avg:
+        type: integer
+      hr_max:
+        type: integer
+      id:
+        type: string
+      intensity:
+        type: number
+      source:
+        type: string
+      speed_max_kmh:
+        type: number
+      sprints:
+        type: integer
+      started_at:
+        type: string
+      user_id:
+        type: string
     type: object
 host: localhost:8080
 info:
@@ -119,6 +175,97 @@ paths:
       summary: Update my profile
       tags:
       - profile
+  /v1/sessions:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/session.Session'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpapi.errorResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/httpapi.errorResponse'
+      security:
+      - BearerAuth: []
+      summary: List my sessions
+      tags:
+      - sessions
+    post:
+      consumes:
+      - application/json
+      description: Stores a new sport session owned by the authenticated user.
+      parameters:
+      - description: Session payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.createSessionRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/session.Session'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpapi.errorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpapi.errorResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/httpapi.errorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create a session
+      tags:
+      - sessions
+  /v1/sessions/{id}:
+    get:
+      parameters:
+      - description: Session id
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/session.Session'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpapi.errorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpapi.errorResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/httpapi.errorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get a session
+      tags:
+      - sessions
 schemes:
 - http
 securityDefinitions:

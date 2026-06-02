@@ -28,6 +28,7 @@ import (
 	"github.com/MGeovany/rivalo-server/internal/httpapi"
 	"github.com/MGeovany/rivalo-server/internal/logger"
 	"github.com/MGeovany/rivalo-server/internal/profile"
+	"github.com/MGeovany/rivalo-server/internal/session"
 )
 
 func main() {
@@ -46,6 +47,7 @@ func run() error {
 	// stateless endpoints such as /health.
 	var pinger httpapi.Pinger
 	var profiles profile.Store
+	var sessions session.Store
 	if cfg.DatabaseURL != "" {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
@@ -58,6 +60,7 @@ func run() error {
 		defer database.Close()
 		pinger = database
 		profiles = profile.NewPostgresStore(database.Pool)
+		sessions = session.NewPostgresStore(database.Pool)
 		logger.Info("database_ready")
 	} else {
 		logger.Warn("database_disabled")
@@ -71,6 +74,7 @@ func run() error {
 		Handler: httpapi.NewRouter(httpapi.Deps{
 			DB:       pinger,
 			Profiles: profiles,
+			Sessions: sessions,
 			Verifier: verifier,
 		}),
 		ReadHeaderTimeout: 5 * time.Second,

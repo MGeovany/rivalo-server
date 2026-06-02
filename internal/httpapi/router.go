@@ -11,14 +11,16 @@ import (
 	"github.com/MGeovany/rivalo-server/internal/auth"
 	"github.com/MGeovany/rivalo-server/internal/logger"
 	"github.com/MGeovany/rivalo-server/internal/profile"
+	"github.com/MGeovany/rivalo-server/internal/session"
 )
 
-// Deps holds the dependencies the HTTP handlers need. DB and Profiles may be nil
-// in environments without a configured database; in that case /health reports
-// the database as disabled and the profile endpoints return 503.
+// Deps holds the dependencies the HTTP handlers need. DB, Profiles and Sessions
+// may be nil in environments without a configured database; in that case
+// /health reports the database as disabled and the data endpoints return 503.
 type Deps struct {
 	DB       Pinger
 	Profiles profile.Store
+	Sessions session.Store
 	Verifier auth.Verifier
 }
 
@@ -30,6 +32,10 @@ func NewRouter(d Deps) http.Handler {
 
 	mux.HandleFunc("GET /v1/me", d.requireAuth(d.handleGetMe))
 	mux.HandleFunc("PUT /v1/me", d.requireAuth(d.handleUpdateMe))
+
+	mux.HandleFunc("POST /v1/sessions", d.requireAuth(d.handleCreateSession))
+	mux.HandleFunc("GET /v1/sessions", d.requireAuth(d.handleListSessions))
+	mux.HandleFunc("GET /v1/sessions/{id}", d.requireAuth(d.handleGetSession))
 
 	mux.Handle("/docs/", httpSwagger.Handler(httpSwagger.URL("/docs/doc.json")))
 	mux.HandleFunc("GET /docs", func(w http.ResponseWriter, r *http.Request) {
