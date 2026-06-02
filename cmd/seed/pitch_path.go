@@ -1,6 +1,9 @@
 package main
 
-import "math"
+import (
+	"math"
+	"math/rand"
+)
 
 // Demo pitch anchor (Tegucigalpa area) — lat/lon span maps 0…1 pitch coords to GPS.
 const (
@@ -10,50 +13,29 @@ const (
 	demoSpanLon  = 0.00011 // ~105 m length
 )
 
-// demoPitchXY returns normalized pitch coordinates (0…1) with attack → +X (right).
-// Layout matches the reference heatmap: hot zones bottom-right and center-right.
-func demoPitchXY(tOffsetS, durationS, sessionIndex int, posBias float64) (x, y float64) {
-	if durationS <= 0 {
-		return clamp01(0.5 + posBias), 0.5
+// demoPathPoints returns a realistic, position-anchored trajectory as normalized
+// (x,y) coordinates (0…1, attack → +X). Instead of a smooth loop (which renders
+// as a ring), it is an Ornstein-Uhlenbeck random walk: the player drifts around a
+// home zone with frequent direction changes, producing a natural cloud heatmap
+// and a jagged route. Deterministic per sessionIndex.
+func demoPathPoints(durationS, sessionIndex int, xHome, yHome float64) [][2]float64 {
+	r := rand.New(rand.NewSource(int64(sessionIndex)*9973 + 7))
+	const theta = 0.08 // pull back toward home
+	const sigma = 0.06 // step volatility
+
+	x, y := xHome, yHome
+	points := make([][2]float64, 0, durationS/5+1)
+	for offset := 0; offset <= durationS; offset += 5 {
+		// Occasional attacking/defensive surge: shift the target forward briefly.
+		targetX := xHome
+		if r.Float64() < 0.08 {
+			targetX = clamp01(xHome + (r.Float64()-0.3)*0.5)
+		}
+		x += theta*(targetX-x) + sigma*r.NormFloat64()
+		y += theta*(yHome-y) + sigma*r.NormFloat64()
+		points = append(points, [2]float64{clamp01(x), clamp01(y)})
 	}
-	progress := float64(tOffsetS) / float64(durationS)
-	t := float64(tOffsetS)
-
-	// Slight variation per session so charts are not identical.
-	shift := float64(sessionIndex) * 0.04
-
-	var cx, cy float64
-	switch {
-	case progress < 0.12:
-		cx, cy = 0.28+shift*0.3, 0.48 // defensive left
-	case progress < 0.28:
-		cx, cy = 0.42, 0.55+math.Sin(t*0.02)*0.06 // build-up
-	case progress < 0.45:
-		cx, cy = 0.58, 0.42 // midfield lane
-	case progress < 0.62:
-		cx, cy = 0.70, 0.38 // center-right band
-	case progress < 0.78:
-		cx, cy = 0.78, 0.58 // attacking third
-	default:
-		cx, cy = 0.82, 0.70 // bottom-right hot zone
-	}
-
-	// Linger in high-density zones (reference red clusters).
-	if progress > 0.5 && progress < 0.85 {
-		cx += math.Sin(t*0.035)*0.06 + 0.04
-		cy += math.Cos(t*0.028)*0.07
-	}
-	if progress > 0.35 && progress < 0.55 {
-		cx += 0.02
-		cy += math.Sin(t*0.04)*0.05
-	}
-
-	jitterX := math.Sin(t*0.11)*0.03 + math.Cos(t*0.07)*0.02
-	jitterY := math.Cos(t*0.09)*0.04 + math.Sin(t*0.13)*0.02
-
-	x = clamp01(cx + jitterX + posBias)
-	y = clamp01(cy + jitterY)
-	return x, y
+	return points
 }
 
 func pitchToGPS(x, y float64) (lat, lon float64) {

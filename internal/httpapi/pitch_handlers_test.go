@@ -41,6 +41,8 @@ func (f *fakePitchStore) Create(_ context.Context, userID string, n pitch.NewPit
 		LengthM:           n.LengthM,
 		WidthM:            n.WidthM,
 		MeasurementMethod: n.MeasurementMethod,
+		Indoor:            n.Indoor,
+		Notes:             n.Notes,
 		CreatedAt:         now,
 		UpdatedAt:         now,
 	}
@@ -93,6 +95,12 @@ func (f *fakePitchStore) Update(_ context.Context, userID, id string, u pitch.Pi
 			}
 			if u.MeasurementMethod != nil {
 				p.MeasurementMethod = u.MeasurementMethod
+			}
+			if u.Indoor != nil {
+				p.Indoor = u.Indoor
+			}
+			if u.Notes != nil {
+				p.Notes = u.Notes
 			}
 			f.items[userID][i] = p
 			return p, nil
@@ -150,6 +158,31 @@ func TestCreatePitch_Valid_201(t *testing.T) {
 	}
 	if p.UserID != "user-1" || p.Name != "Home field" || p.ID == "" {
 		t.Errorf("unexpected pitch: %+v", p)
+	}
+}
+
+func TestCreatePitch_DetailFields_RoundTrip(t *testing.T) {
+	ps := newFakePitchStore()
+	token := signToken(t, testSecret, "user-1", time.Now().Add(time.Hour))
+	body := validPitchBody()
+	indoor := true
+	notes := "Lights until 10pm, gate code 1234"
+	body.Indoor = &indoor
+	body.Notes = &notes
+
+	rec := doRequest(t, pitchDeps(ps), http.MethodPost, "/v1/pitches", "Bearer "+token, body)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want 201; body = %s", rec.Code, rec.Body.String())
+	}
+	var created pitch.Pitch
+	if err := json.NewDecoder(rec.Body).Decode(&created); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if created.Indoor == nil || !*created.Indoor {
+		t.Errorf("indoor not persisted: %+v", created.Indoor)
+	}
+	if created.Notes == nil || *created.Notes != notes {
+		t.Errorf("notes not persisted: %+v", created.Notes)
 	}
 }
 

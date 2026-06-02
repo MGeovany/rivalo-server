@@ -18,6 +18,8 @@ type createPitchRequest struct {
 	LengthM           *float64 `json:"length_m"`
 	WidthM            *float64 `json:"width_m"`
 	MeasurementMethod *string  `json:"measurement_method"`
+	Indoor            *bool    `json:"indoor"`
+	Notes             *string  `json:"notes"`
 }
 
 // updatePitchRequest is the JSON body for PUT /v1/pitches/{id}.
@@ -30,6 +32,8 @@ type updatePitchRequest struct {
 	LengthM           *float64 `json:"length_m"`
 	WidthM            *float64 `json:"width_m"`
 	MeasurementMethod *string  `json:"measurement_method"`
+	Indoor            *bool    `json:"indoor"`
+	Notes             *string  `json:"notes"`
 }
 
 // handleCreatePitch stores a new pitch for the authenticated user.
@@ -239,6 +243,8 @@ func (req createPitchRequest) validate() (pitch.NewPitch, string) {
 		LengthM:           req.LengthM,
 		WidthM:            req.WidthM,
 		MeasurementMethod: req.MeasurementMethod,
+		Indoor:            req.Indoor,
+		Notes:             req.Notes,
 	}, ""
 }
 
@@ -252,5 +258,7 @@ func (req updatePitchRequest) toUpdate() pitch.PitchUpdate {
 		LengthM:           req.LengthM,
 		WidthM:            req.WidthM,
 		MeasurementMethod: req.MeasurementMethod,
+		Indoor:            req.Indoor,
+		Notes:             req.Notes,
 	}
 }

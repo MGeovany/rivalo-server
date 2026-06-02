@@ -262,15 +262,20 @@ func seedPitches(ctx context.Context, tx pgx.Tx, userID string) error {
 		{demoPitchIDs[2], "Polideportivo Sur", "5-a-side", "Indoor", 40, 20, "manual", -0.0030, 0.0020},
 	}
 	const q = `
-		insert into public.pitches (id, user_id, name, latitude, longitude, type, surface, length_m, width_m, measurement_method)
-		values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+		insert into public.pitches (id, user_id, name, latitude, longitude, type, surface, length_m, width_m, measurement_method,
+			indoor, notes)
+		values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
 		on conflict (id) do update set
 			name = excluded.name, latitude = excluded.latitude, longitude = excluded.longitude,
 			type = excluded.type, surface = excluded.surface, length_m = excluded.length_m,
-			width_m = excluded.width_m, measurement_method = excluded.measurement_method, updated_at = now()`
+			width_m = excluded.width_m, measurement_method = excluded.measurement_method,
+			indoor = excluded.indoor, notes = excluded.notes, updated_at = now()`
 	for _, p := range pitches {
+		indoor := p.surface == "Indoor"
+		notes := "Demo court — synthetic data for previews."
 		if _, err := tx.Exec(ctx, q, p.id, userID, p.name,
 			demoBaseLat+p.latOffset, demoBaseLon+p.lonOffset, p.pType, p.surface, p.lengthM, p.widthM, p.measurementMethod,
+			indoor, notes,
 		); err != nil {
 			return err
 		}
@@ -379,7 +384,7 @@ func seedSessions(ctx context.Context, pool *pgxpool.Pool, userID string) (int, 
 		if err := insertSamples(ctx, tx, id, m.hrAvg, m.hrMax, durationS, halftimeS); err != nil {
 			return 0, err
 		}
-		if err := insertPath(ctx, tx, id, i, durationS, positionXBias(m.position)); err != nil {
+		if err := insertPath(ctx, tx, id, i, durationS, m.position); err != nil {
 			return 0, err
 		}
 	}
@@ -416,12 +421,15 @@ func insertSamples(ctx context.Context, tx pgx.Tx, sessionID string, hrAvg, hrMa
 	return err
 }
 
-func insertPath(ctx context.Context, tx pgx.Tx, sessionID string, sessionIndex, durationS int, posBias float64) error {
-	rows := make([][]any, 0, durationS/5+1)
-	for offset := 0; offset <= durationS; offset += 5 {
-		x, y := demoPitchXY(offset, durationS, sessionIndex, posBias)
-		lat, lon := pitchToGPS(x, y)
-		rows = append(rows, []any{sessionID, offset, lat, lon})
+func insertPath(ctx context.Context, tx pgx.Tx, sessionID string, sessionIndex, durationS int, position string) error {
+	xHome := clamp01(0.5 + positionXBias(position))
+	yHome := positionYHome(position, sessionIndex)
+	points := demoPathPoints(durationS, sessionIndex, xHome, yHome)
+
+	rows := make([][]any, 0, len(points))
+	for i, p := range points {
+		lat, lon := pitchToGPS(p[0], p[1])
+		rows = append(rows, []any{sessionID, i * 5, lat, lon})
 	}
 	_, err := tx.CopyFrom(ctx,
 		pgx.Identifier{"public", "session_path"},
@@ -429,6 +437,25 @@ func insertPath(ctx context.Context, tx pgx.Tx, sessionID string, sessionIndex, 
 		pgx.CopyFromRows(rows),
 	)
 	return err
+}
+
+// positionYHome returns the player's home width (0…1). Wide roles sit near a
+// touchline (alternating side per session); central roles stay middle.
+func positionYHome(position string, sessionIndex int) float64 {
+	wide := func(a, b float64) float64 {
+		if sessionIndex%2 == 0 {
+			return a
+		}
+		return b
+	}
+	switch position {
+	case "Winger":
+		return wide(0.24, 0.76)
+	case "Full-back":
+		return wide(0.20, 0.80)
+	default:
+		return 0.5
+	}
 }
 
 func nilIfEmpty(s string) *string {

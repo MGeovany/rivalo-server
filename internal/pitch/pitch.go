@@ -25,6 +25,8 @@ type Pitch struct {
 	LengthM           *float64  `json:"length_m,omitempty"`
 	WidthM            *float64  `json:"width_m,omitempty"`
 	MeasurementMethod *string   `json:"measurement_method,omitempty"`
+	Indoor            *bool     `json:"indoor,omitempty"`
+	Notes             *string   `json:"notes,omitempty"`
 	CreatedAt         time.Time `json:"created_at"`
 	UpdatedAt         time.Time `json:"updated_at"`
 }
@@ -39,6 +41,8 @@ type NewPitch struct {
 	LengthM           *float64
 	WidthM            *float64
 	MeasurementMethod *string
+	Indoor            *bool
+	Notes             *string
 }
 
 // PitchUpdate carries editable fields (nil = not touched).
@@ -51,6 +55,8 @@ type PitchUpdate struct {
 	LengthM           *float64
 	WidthM            *float64
 	MeasurementMethod *string
+	Indoor            *bool
+	Notes             *string
 }
 
 // Store persists pitches.

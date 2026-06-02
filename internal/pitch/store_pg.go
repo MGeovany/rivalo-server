@@ -17,17 +17,19 @@ func NewPostgresStore(pool *pgxpool.Pool) *PostgresStore {
 }
 
 const pitchColumns = `id, user_id, name, latitude, longitude, type, surface,
-	length_m, width_m, measurement_method, created_at, updated_at`
+	length_m, width_m, measurement_method, indoor, notes,
+	created_at, updated_at`
 
 func (s *PostgresStore) Create(ctx context.Context, userID string, n NewPitch) (Pitch, error) {
 	const query = `
 		insert into public.pitches
-			(user_id, name, latitude, longitude, type, surface, length_m, width_m, measurement_method)
-		values ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+			(user_id, name, latitude, longitude, type, surface, length_m, width_m, measurement_method,
+			 indoor, notes)
+		values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 		returning ` + pitchColumns
 	return scanPitch(s.pool.QueryRow(ctx, query,
 		userID, n.Name, n.Latitude, n.Longitude, n.Type, n.Surface,
-		n.LengthM, n.WidthM, n.MeasurementMethod,
+		n.LengthM, n.WidthM, n.MeasurementMethod, n.Indoor, n.Notes,
 	))
 }
 
@@ -78,6 +80,8 @@ func (s *PostgresStore) Update(ctx context.Context, userID, id string, u PitchUp
 			length_m = coalesce($8, length_m),
 			width_m = coalesce($9, width_m),
 			measurement_method = coalesce($10, measurement_method),
+			indoor = coalesce($11, indoor),
+			notes = coalesce($12, notes),
 			updated_at = now()
 		where id = $1 and user_id = $2
 		returning ` + pitchColumns
@@ -85,7 +89,7 @@ func (s *PostgresStore) Update(ctx context.Context, userID, id string, u PitchUp
 	p, err := scanPitch(s.pool.QueryRow(ctx, query,
 		id, userID,
 		u.Name, u.Latitude, u.Longitude, u.Type, u.Surface,
-		u.LengthM, u.WidthM, u.MeasurementMethod,
+		u.LengthM, u.WidthM, u.MeasurementMethod, u.Indoor, u.Notes,
 	))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Pitch{}, ErrNotFound
@@ -120,7 +124,7 @@ func scanPitch(r scanRow) (Pitch, error) {
 	err := r.Scan(
 		&p.ID, &p.UserID, &p.Name,
 		&p.Latitude, &p.Longitude, &p.Type, &p.Surface,
-		&p.LengthM, &p.WidthM, &p.MeasurementMethod,
+		&p.LengthM, &p.WidthM, &p.MeasurementMethod, &p.Indoor, &p.Notes,
 		&p.CreatedAt, &p.UpdatedAt,
 	)
 	return p, err

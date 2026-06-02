@@ -1,4 +1,4 @@
-h1:NQyFNtOg3e0vzBzZjwiZUCHiXYTKbsT0bEICLDid7oQ=
+h1:KVwrp2wLle5XsaP9ORxoBmEOtF1PkeYLS1Mys2HUVt4=
 20260601000001_init_profiles.sql h1:KJnCzU5uPFz5wVW0u04c8tSOSs1rBBC9fsWDgi6nzLI=
 20260601000002_add_sessions.sql h1:jHWWRC7uycyjrjDG/z97XhNwCDGMoDVYqt00t1sB2Pw=
 20260601000003_add_session_samples.sql h1:Tv7g4wLVJgvFn9nXkOlFburm7IPNbJCqL7/LYkjke3k=
@@ -6,3 +6,4 @@ h1:NQyFNtOg3e0vzBzZjwiZUCHiXYTKbsT0bEICLDid7oQ=
 20260602000001_player_card_storage.sql h1:9zS2w+3VZpGl0O3h0NAhZlxEjFmO8TWE6svIsSrRaKg=
 20260602000002_add_opponent.sql h1:Z1m3baWJ5tl8Jv/5rbFs8A9m/+v9ZhZnkeIvtX8+s1A=
 20260602000003_add_match_result.sql h1:NR5UKLBFoiM4jU8N9MnNBXTfo8c2wHN1cprrv4rDW/Y=
+20260602000004_pitch_details.sql h1:loDMz3rw6skBKG4et9HsZcJnWW+ntVyccwEYKKqNwBc=
