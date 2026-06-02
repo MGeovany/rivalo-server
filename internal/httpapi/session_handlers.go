@@ -102,9 +102,6 @@ func (d Deps) handleCreateSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// G.2: flag personal records this session broke. Only meaningful once the
-	// user has prior history — the very first session trivially "owns" every
-	// best, which is not a broken record.
 	if existing, err := d.Sessions.List(r.Context(), uid); err == nil && len(existing) > 1 {
 		if records, err := d.Sessions.GetPersonalRecords(r.Context(), uid); err == nil {
 			for _, rec := range records.Records {
