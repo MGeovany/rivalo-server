@@ -45,6 +45,7 @@ func NewRouter(d Deps) http.Handler {
 	mux.HandleFunc("GET /v1/sessions", d.requireAuth(d.handleListSessions))
 	mux.HandleFunc("GET /v1/sessions/records", d.requireAuth(d.handleGetRecords))
 	mux.HandleFunc("GET /v1/sessions/insights", d.requireAuth(d.handleGetInsights))
+	mux.HandleFunc("GET /v1/sessions/position-insights", d.requireAuth(d.handleGetPositionInsights))
 	mux.HandleFunc("GET /v1/sessions/{id}", d.requireAuth(d.handleGetSession))
 	mux.HandleFunc("PUT /v1/sessions/{id}", d.requireAuth(d.handleUpdateSession))
 	mux.HandleFunc("PATCH /v1/sessions/{id}", d.requireAuth(d.handlePatchSessionContext))

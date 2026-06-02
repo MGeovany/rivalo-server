@@ -207,6 +207,7 @@ type Store interface {
 	GetPersonalRecords(ctx context.Context, userID string) (PersonalRecords, error)
 	// GetInsights returns aggregated stats and per-context breakdowns.
 	GetInsights(ctx context.Context, userID string) (SessionInsights, error)
+	GetPositionInsights(ctx context.Context, userID string) (PositionInsights, error)
 }
 
 // Update carries editable aggregate fields (samples are not modified).

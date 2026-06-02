@@ -417,6 +417,39 @@ func (s *PostgresStore) GetInsights(ctx context.Context, userID string) (Session
 	return ins, nil
 }
 
+func (s *PostgresStore) GetPositionInsights(ctx context.Context, userID string) (PositionInsights, error) {
+	const query = `
+		select position, count(*)::int,
+			avg(distance_m), avg(sprints)::float8, avg(intensity),
+			avg(match_rating), avg(duration_s)::float8
+		from public.sessions
+		where user_id = $1 and position is not null and position <> ''
+		group by position`
+
+	rows, err := s.pool.Query(ctx, query, userID)
+	if err != nil {
+		return PositionInsights{}, err
+	}
+	defer rows.Close()
+
+	var all []PositionStat
+	for rows.Next() {
+		var p PositionStat
+		if err := rows.Scan(
+			&p.Position, &p.SessionCount,
+			&p.AvgDistanceM, &p.AvgSprints, &p.AvgIntensity,
+			&p.AvgMatchRating, &p.AvgDurationS,
+		); err != nil {
+			return PositionInsights{}, err
+		}
+		all = append(all, p)
+	}
+	if err := rows.Err(); err != nil {
+		return PositionInsights{}, err
+	}
+	return AssemblePositionInsights(all), nil
+}
+
 func (s *PostgresStore) loadSamples(ctx context.Context, sessionID string) ([]Sample, error) {
 	const query = `
 		select t_offset_s, hr, speed_kmh, half

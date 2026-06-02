@@ -333,6 +333,61 @@ func (f *fakeSessionStore) GetInsights(_ context.Context, userID string) (sessio
 	return ins, nil
 }
 
+func (f *fakeSessionStore) GetPositionInsights(_ context.Context, userID string) (session.PositionInsights, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	type accum struct {
+		count                                  int
+		distSum, sprintsSum, intSum, ratingSum float64
+		durSum                                 float64
+		intN, ratingN                          int
+	}
+	m := map[string]*accum{}
+	for _, s := range f.items[userID] {
+		if s.Position == nil || *s.Position == "" {
+			continue
+		}
+		a := m[*s.Position]
+		if a == nil {
+			a = &accum{}
+			m[*s.Position] = a
+		}
+		a.count++
+		a.distSum += s.DistanceM
+		a.sprintsSum += float64(s.Sprints)
+		a.durSum += float64(s.DurationS)
+		if s.Intensity != nil {
+			a.intSum += *s.Intensity
+			a.intN++
+		}
+		if s.MatchRating != nil {
+			a.ratingSum += *s.MatchRating
+			a.ratingN++
+		}
+	}
+
+	var all []session.PositionStat
+	for pos, a := range m {
+		n := float64(a.count)
+		p := session.PositionStat{
+			Position:     pos,
+			SessionCount: a.count,
+			AvgDistanceM: floatPtr(a.distSum / n),
+			AvgSprints:   floatPtr(a.sprintsSum / n),
+			AvgDurationS: floatPtr(a.durSum / n),
+		}
+		if a.intN > 0 {
+			p.AvgIntensity = floatPtr(a.intSum / float64(a.intN))
+		}
+		if a.ratingN > 0 {
+			p.AvgMatchRating = floatPtr(a.ratingSum / float64(a.ratingN))
+		}
+		all = append(all, p)
+	}
+	return session.AssemblePositionInsights(all), nil
+}
+
 func (f *fakeSessionStore) Delete(_ context.Context, userID, id string) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
