@@ -10,6 +10,7 @@ import (
 
 	"github.com/MGeovany/rivalo-server/internal/auth"
 	"github.com/MGeovany/rivalo-server/internal/badge"
+	"github.com/MGeovany/rivalo-server/internal/goal"
 	"github.com/MGeovany/rivalo-server/internal/logger"
 	"github.com/MGeovany/rivalo-server/internal/pitch"
 	"github.com/MGeovany/rivalo-server/internal/profile"
@@ -25,6 +26,7 @@ type Deps struct {
 	Sessions session.Store
 	Pitches  pitch.Store
 	Badges   badge.Store
+	Goals    goal.Store
 	Verifier auth.Verifier
 }
 
@@ -53,6 +55,11 @@ func NewRouter(d Deps) http.Handler {
 	mux.HandleFunc("GET /v1/recap/weekly", d.requireAuth(d.handleGetWeeklyRecap))
 	mux.HandleFunc("GET /v1/badges", d.requireAuth(d.handleGetBadges))
 	mux.HandleFunc("GET /v1/rivalries", d.requireAuth(d.handleGetRivalries))
+	mux.HandleFunc("POST /v1/goals", d.requireAuth(d.handleCreateGoal))
+	mux.HandleFunc("GET /v1/goals", d.requireAuth(d.handleListGoals))
+	mux.HandleFunc("GET /v1/goals/{id}", d.requireAuth(d.handleGetGoal))
+	mux.HandleFunc("PATCH /v1/goals/{id}", d.requireAuth(d.handleUpdateGoal))
+	mux.HandleFunc("DELETE /v1/goals/{id}", d.requireAuth(d.handleDeleteGoal))
 	mux.HandleFunc("GET /v1/sessions/{id}", d.requireAuth(d.handleGetSession))
 	mux.HandleFunc("PUT /v1/sessions/{id}", d.requireAuth(d.handleUpdateSession))
 	mux.HandleFunc("PATCH /v1/sessions/{id}", d.requireAuth(d.handlePatchSessionContext))
