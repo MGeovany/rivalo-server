@@ -395,6 +395,26 @@ func (f *fakeSessionStore) GetPositionInsights(_ context.Context, userID string)
 	return session.AssemblePositionInsights(all), nil
 }
 
+func (f *fakeSessionStore) GetRivalries(_ context.Context, userID string) ([]session.Rivalry, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	var list []session.RivalSession
+	for _, s := range f.items[userID] {
+		if s.Opponent == nil || *s.Opponent == "" {
+			continue
+		}
+		list = append(list, session.RivalSession{
+			Opponent:    *s.Opponent,
+			Outcome:     s.Outcome,
+			StartedAt:   s.StartedAt,
+			DistanceM:   s.DistanceM,
+			Sprints:     s.Sprints,
+			MatchRating: s.MatchRating,
+		})
+	}
+	return session.BuildRivalries(list), nil
+}
+
 func (f *fakeSessionStore) GetStreaks(_ context.Context, userID string) (session.Streaks, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()

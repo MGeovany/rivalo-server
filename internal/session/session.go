@@ -237,6 +237,8 @@ type Store interface {
 	GetWeeklyRecap(ctx context.Context, userID string) (WeeklyRecap, error)
 	// GetBadgeMetrics returns the aggregate bests used to evaluate badges.
 	GetBadgeMetrics(ctx context.Context, userID string) (BadgeMetrics, error)
+	// GetRivalries returns aggregated histories per frequent opponent.
+	GetRivalries(ctx context.Context, userID string) ([]Rivalry, error)
 }
 
 // BadgeMetrics are session-derived aggregates for badge evaluation.

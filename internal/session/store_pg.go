@@ -583,6 +583,33 @@ func (s *PostgresStore) GetBadgeMetrics(ctx context.Context, userID string) (Bad
 	return m, nil
 }
 
+func (s *PostgresStore) GetRivalries(ctx context.Context, userID string) ([]Rivalry, error) {
+	const query = `
+		select opponent, outcome, started_at, distance_m, sprints, match_rating
+		from public.sessions
+		where user_id = $1 and opponent is not null and opponent <> ''`
+
+	rows, err := s.pool.Query(ctx, query, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var list []RivalSession
+	for rows.Next() {
+		var rs RivalSession
+		if err := rows.Scan(&rs.Opponent, &rs.Outcome, &rs.StartedAt, &rs.DistanceM, &rs.Sprints, &rs.MatchRating); err != nil {
+			return nil, err
+		}
+		list = append(list, rs)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return BuildRivalries(list), nil
+}
+
 func (s *PostgresStore) loadSamples(ctx context.Context, sessionID string) ([]Sample, error) {
 	const query = `
 		select t_offset_s, hr, speed_kmh, half
