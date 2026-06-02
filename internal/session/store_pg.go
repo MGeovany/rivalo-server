@@ -111,6 +111,46 @@ func (s *PostgresStore) Get(ctx context.Context, userID, id string) (Session, er
 	return sess, nil
 }
 
+func (s *PostgresStore) Update(ctx context.Context, userID, id string, u Update) (Session, error) {
+	const query = `
+		update public.sessions set
+			started_at = $3, ended_at = $4, duration_s = $5, distance_m = $6,
+			hr_avg = $7, hr_max = $8, speed_max_kmh = $9, sprints = $10,
+			intensity = $11, calories_kcal = $12
+		where id = $1 and user_id = $2
+		returning ` + sessionColumns
+
+	sess, err := scanSession(s.pool.QueryRow(ctx, query,
+		id, userID, u.StartedAt, u.EndedAt, u.DurationS, u.DistanceM,
+		u.HRAvg, u.HRMax, u.SpeedMaxKMH, u.Sprints, u.Intensity, u.CaloriesKcal,
+	))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Session{}, ErrNotFound
+	}
+	if err != nil {
+		return Session{}, err
+	}
+
+	samples, err := s.loadSamples(ctx, sess.ID)
+	if err != nil {
+		return Session{}, err
+	}
+	sess.Samples = samples
+	return sess, nil
+}
+
+func (s *PostgresStore) Delete(ctx context.Context, userID, id string) error {
+	const query = `delete from public.sessions where id = $1 and user_id = $2`
+	tag, err := s.pool.Exec(ctx, query, id, userID)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
 func (s *PostgresStore) loadSamples(ctx context.Context, sessionID string) ([]Sample, error) {
 	const query = `
 		select t_offset_s, hr, speed_kmh

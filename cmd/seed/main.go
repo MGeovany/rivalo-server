@@ -15,6 +15,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -60,11 +61,9 @@ func main() {
 		log.Fatal("DATABASE_URL, SUPABASE_URL, and SUPABASE_SERVICE_ROLE_KEY must be set in .env")
 	}
 
-	userID, err := ensureAuthUser(ctx, supabaseURL, serviceKey, demoEmail, demoPassword)
-	if err != nil {
+	if _, err := ensureAuthUser(ctx, supabaseURL, serviceKey, demoEmail, demoPassword); err != nil {
 		log.Fatal(err)
 	}
-	log.Printf("auth user %s id=%s", demoEmail, userID)
 
 	pool, err := pgxpool.New(ctx, dbURL)
 	if err != nil {
@@ -72,14 +71,21 @@ func main() {
 	}
 	defer pool.Close()
 
+	userID, err := userIDFromDB(ctx, pool, demoEmail)
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Printf("auth user %s id=%s", demoEmail, userID)
+
 	if err := seedProfile(ctx, pool, userID); err != nil {
 		log.Fatal(err)
 	}
-	if err := seedSessions(ctx, pool, userID); err != nil {
+	sessionCount, err := seedSessions(ctx, pool, userID)
+	if err != nil {
 		log.Fatal(err)
 	}
 
-	log.Printf("done — login in app with %s / %s", demoEmail, demoPassword)
+	log.Printf("done — profile + %d sessions for %s / %s", sessionCount, demoEmail, demoPassword)
 }
 
 func ensureAuthUser(ctx context.Context, baseURL, serviceKey, email, password string) (string, error) {
@@ -88,7 +94,10 @@ func ensureAuthUser(ctx context.Context, baseURL, serviceKey, email, password st
 		return "", err
 	}
 	if existing != "" {
-		log.Printf("auth user already exists")
+		log.Printf("auth user already exists — syncing password and email_confirm")
+		if err := syncAuthUser(ctx, baseURL, serviceKey, existing, password); err != nil {
+			return "", err
+		}
 		return existing, nil
 	}
 
@@ -127,8 +136,50 @@ func ensureAuthUser(ctx context.Context, baseURL, serviceKey, email, password st
 	return out.ID, nil
 }
 
+func syncAuthUser(ctx context.Context, baseURL, serviceKey, userID, password string) error {
+	body, _ := json.Marshal(map[string]any{
+		"password":      password,
+		"email_confirm": true,
+	})
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, baseURL+"/auth/v1/admin/users/"+userID, bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Authorization", "Bearer "+serviceKey)
+	req.Header.Set("apikey", serviceKey)
+	req.Header.Set("Content-Type", "application/json")
+
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+	raw, _ := io.ReadAll(res.Body)
+	if res.StatusCode >= 300 {
+		return fmt.Errorf("sync user: %s %s", res.Status, string(raw))
+	}
+	return nil
+}
+
+func userIDFromDB(ctx context.Context, pool *pgxpool.Pool, email string) (string, error) {
+	var id string
+	err := pool.QueryRow(ctx, `select id::text from auth.users where email = $1`, email).Scan(&id)
+	if err != nil {
+		return "", fmt.Errorf("lookup auth.users for %s: %w", email, err)
+	}
+	return id, nil
+}
+
 func findUserByEmail(ctx context.Context, baseURL, serviceKey, email string) (string, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, baseURL+"/auth/v1/admin/users?email="+email, nil)
+	endpoint, err := url.Parse(baseURL + "/auth/v1/admin/users")
+	if err != nil {
+		return "", err
+	}
+	q := endpoint.Query()
+	q.Set("email", email)
+	endpoint.RawQuery = q.Encode()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
 	if err != nil {
 		return "", err
 	}
@@ -176,7 +227,7 @@ func seedProfile(ctx context.Context, pool *pgxpool.Pool, userID string) error {
 	return err
 }
 
-func seedSessions(ctx context.Context, pool *pgxpool.Pool, userID string) error {
+func seedSessions(ctx context.Context, pool *pgxpool.Pool, userID string) (int, error) {
 	matches := []demoMatch{
 		{demoSessionIDs[0], 35, 82, 8120, 138, 162, 24.2, 7, 68, 620},
 		{demoSessionIDs[1], 28, 90, 9050, 145, 171, 25.1, 11, 74, 710},
@@ -187,15 +238,15 @@ func seedSessions(ctx context.Context, pool *pgxpool.Pool, userID string) error 
 
 	tx, err := pool.Begin(ctx)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	defer tx.Rollback(ctx)
 
 	if _, err := tx.Exec(ctx, `delete from public.session_samples where session_id = any($1)`, demoSessionIDs[:]); err != nil {
-		return err
+		return 0, err
 	}
 	if _, err := tx.Exec(ctx, `delete from public.sessions where id = any($1)`, demoSessionIDs[:]); err != nil {
-		return err
+		return 0, err
 	}
 
 	const insertSession = `
@@ -219,17 +270,20 @@ func seedSessions(ctx context.Context, pool *pgxpool.Pool, userID string) error 
 			m.id, userID, start, end, durationS, m.distanceM,
 			m.hrAvg, m.hrMax, m.speedMax, m.sprints, m.intensity, m.calories, "watch",
 		); err != nil {
-			return err
+			return 0, err
 		}
 
 		for offset := 0; offset <= durationS; offset += 300 {
 			hr := m.hrAvg - 15 + (offset/300)*3 + (offset % 120 / 20)
 			speed := 8.0 + (float64(offset)/float64(durationS))*12.0
 			if _, err := tx.Exec(ctx, insertSample, m.id, offset, hr, speed); err != nil {
-				return err
+				return 0, err
 			}
 		}
 	}
 
-	return tx.Commit(ctx)
+	if err := tx.Commit(ctx); err != nil {
+		return 0, err
+	}
+	return len(matches), nil
 }

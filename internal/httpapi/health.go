@@ -4,6 +4,8 @@ import (
 	"context"
 	"net/http"
 	"time"
+
+	"github.com/MGeovany/rivalo-server/internal/logger"
 )
 
 // Pinger reports whether a backing dependency (e.g. the database) is reachable.
@@ -36,6 +38,7 @@ func healthHandler(db Pinger) http.HandlerFunc {
 			ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
 			defer cancel()
 			if err := db.Ping(ctx); err != nil {
+				logger.Warn("health_db_ping_failed", logger.SafeErr(err))
 				dbStatus = "unreachable"
 			} else {
 				dbStatus = "ok"

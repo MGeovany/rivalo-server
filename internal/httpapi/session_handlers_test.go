@@ -67,6 +67,41 @@ func (f *fakeSessionStore) Get(_ context.Context, userID, id string) (session.Se
 	return session.Session{}, session.ErrNotFound
 }
 
+func (f *fakeSessionStore) Update(_ context.Context, userID, id string, u session.Update) (session.Session, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for i, s := range f.items[userID] {
+		if s.ID == id {
+			s.StartedAt = u.StartedAt
+			s.EndedAt = u.EndedAt
+			s.DurationS = u.DurationS
+			s.DistanceM = u.DistanceM
+			s.HRAvg = u.HRAvg
+			s.HRMax = u.HRMax
+			s.SpeedMaxKMH = u.SpeedMaxKMH
+			s.Sprints = u.Sprints
+			s.Intensity = u.Intensity
+			s.CaloriesKcal = u.CaloriesKcal
+			f.items[userID][i] = s
+			return s, nil
+		}
+	}
+	return session.Session{}, session.ErrNotFound
+}
+
+func (f *fakeSessionStore) Delete(_ context.Context, userID, id string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	list := f.items[userID]
+	for i, s := range list {
+		if s.ID == id {
+			f.items[userID] = append(list[:i], list[i+1:]...)
+			return nil
+		}
+	}
+	return session.ErrNotFound
+}
+
 func sessionDeps(store session.Store) Deps {
 	return Deps{Sessions: store, Verifier: auth.NewVerifier(testSecret)}
 }

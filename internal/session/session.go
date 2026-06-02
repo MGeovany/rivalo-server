@@ -68,4 +68,22 @@ type Store interface {
 	List(ctx context.Context, userID string) ([]Session, error)
 	// Get returns a single session owned by userID, or ErrNotFound.
 	Get(ctx context.Context, userID, id string) (Session, error)
+	// Update replaces aggregate fields on an owned session.
+	Update(ctx context.Context, userID, id string, u Update) (Session, error)
+	// Delete removes a session owned by userID.
+	Delete(ctx context.Context, userID, id string) error
+}
+
+// Update carries editable aggregate fields (samples are not modified).
+type Update struct {
+	StartedAt    time.Time
+	EndedAt      time.Time
+	DurationS    int
+	DistanceM    float64
+	HRAvg        *int
+	HRMax        *int
+	SpeedMaxKMH  *float64
+	Sprints      int
+	Intensity    *float64
+	CaloriesKcal *float64
 }

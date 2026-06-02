@@ -48,29 +48,26 @@ type sampleRequest struct {
 //	@Router			/v1/sessions [post]
 func (d Deps) handleCreateSession(w http.ResponseWriter, r *http.Request) {
 	if d.Sessions == nil {
-		writeError(w, http.StatusServiceUnavailable, "sessions are not available")
+		logAndWriteError(w, http.StatusServiceUnavailable, "sessions are not available", "session_create_unavailable", nil)
 		return
 	}
 
 	var req createSessionRequest
 	if err := decodeJSON(w, r, &req); err != nil {
-		logger.Warn("session_create_rejected", "reason", "invalid_json")
-		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		logAndWriteError(w, http.StatusBadRequest, "invalid JSON body", "session_create_rejected", err, "reason", "invalid_json")
 		return
 	}
 
 	newSession, msg := req.validate()
 	if msg != "" {
-		logger.Warn("session_create_rejected", "reason", "validation_failed")
-		writeError(w, http.StatusBadRequest, msg)
+		logAndWriteError(w, http.StatusBadRequest, msg, "session_create_rejected", nil, "reason", "validation_failed")
 		return
 	}
 
 	uid := userID(r.Context())
 	created, err := d.Sessions.Create(r.Context(), uid, newSession)
 	if err != nil {
-		logger.Error("session_create_failed", logger.Ref("user", uid), logger.SafeErr(err))
-		writeError(w, http.StatusInternalServerError, "could not create session")
+		logAndWriteError(w, http.StatusInternalServerError, "could not create session", "session_create_failed", err, logger.Ref("user", uid))
 		return
 	}
 	logger.Info("session_create_ok", logger.Ref("user", uid), logger.Ref("session", created.ID))
@@ -89,15 +86,14 @@ func (d Deps) handleCreateSession(w http.ResponseWriter, r *http.Request) {
 //	@Router			/v1/sessions [get]
 func (d Deps) handleListSessions(w http.ResponseWriter, r *http.Request) {
 	if d.Sessions == nil {
-		writeError(w, http.StatusServiceUnavailable, "sessions are not available")
+		logAndWriteError(w, http.StatusServiceUnavailable, "sessions are not available", "session_list_unavailable", nil)
 		return
 	}
 
 	uid := userID(r.Context())
 	sessions, err := d.Sessions.List(r.Context(), uid)
 	if err != nil {
-		logger.Error("session_list_failed", logger.Ref("user", uid), logger.SafeErr(err))
-		writeError(w, http.StatusInternalServerError, "could not load sessions")
+		logAndWriteError(w, http.StatusInternalServerError, "could not load sessions", "session_list_failed", err, logger.Ref("user", uid))
 		return
 	}
 	writeJSON(w, http.StatusOK, sessions)
@@ -117,7 +113,7 @@ func (d Deps) handleListSessions(w http.ResponseWriter, r *http.Request) {
 //	@Router			/v1/sessions/{id} [get]
 func (d Deps) handleGetSession(w http.ResponseWriter, r *http.Request) {
 	if d.Sessions == nil {
-		writeError(w, http.StatusServiceUnavailable, "sessions are not available")
+		logAndWriteError(w, http.StatusServiceUnavailable, "sessions are not available", "session_get_unavailable", nil)
 		return
 	}
 
@@ -125,15 +121,124 @@ func (d Deps) handleGetSession(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	found, err := d.Sessions.Get(r.Context(), uid, id)
 	if errors.Is(err, session.ErrNotFound) {
-		writeError(w, http.StatusNotFound, "session not found")
+		logAndWriteError(w, http.StatusNotFound, "session not found", "session_get_not_found", err, logger.Ref("user", uid), logger.Ref("session", id))
 		return
 	}
 	if err != nil {
-		logger.Error("session_get_failed", logger.Ref("user", uid), logger.SafeErr(err))
-		writeError(w, http.StatusInternalServerError, "could not load session")
+		logAndWriteError(w, http.StatusInternalServerError, "could not load session", "session_get_failed", err, logger.Ref("user", uid), logger.Ref("session", id))
 		return
 	}
 	writeJSON(w, http.StatusOK, found)
+}
+
+// updateSessionRequest is the JSON body accepted by PUT /v1/sessions/{id}.
+type updateSessionRequest struct {
+	StartedAt    time.Time `json:"started_at"`
+	EndedAt      time.Time `json:"ended_at"`
+	DurationS    int       `json:"duration_s"`
+	DistanceM    float64   `json:"distance_m"`
+	HRAvg        *int      `json:"hr_avg"`
+	HRMax        *int      `json:"hr_max"`
+	SpeedMaxKMH  *float64  `json:"speed_max_kmh"`
+	Sprints      int       `json:"sprints"`
+	Intensity    *float64  `json:"intensity"`
+	CaloriesKcal *float64  `json:"calories_kcal"`
+}
+
+func (d Deps) handleUpdateSession(w http.ResponseWriter, r *http.Request) {
+	if d.Sessions == nil {
+		logAndWriteError(w, http.StatusServiceUnavailable, "sessions are not available", "session_update_unavailable", nil)
+		return
+	}
+
+	var req updateSessionRequest
+	if err := decodeJSON(w, r, &req); err != nil {
+		logAndWriteError(w, http.StatusBadRequest, "invalid JSON body", "session_update_rejected", err, "reason", "invalid_json")
+		return
+	}
+
+	update, msg := req.validate()
+	if msg != "" {
+		logAndWriteError(w, http.StatusBadRequest, msg, "session_update_rejected", nil, "reason", "validation_failed")
+		return
+	}
+
+	uid := userID(r.Context())
+	id := r.PathValue("id")
+	updated, err := d.Sessions.Update(r.Context(), uid, id, update)
+	if errors.Is(err, session.ErrNotFound) {
+		logAndWriteError(w, http.StatusNotFound, "session not found", "session_update_not_found", err, logger.Ref("user", uid), logger.Ref("session", id))
+		return
+	}
+	if err != nil {
+		logAndWriteError(w, http.StatusInternalServerError, "could not update session", "session_update_failed", err, logger.Ref("user", uid), logger.Ref("session", id))
+		return
+	}
+	logger.Info("session_update_ok", logger.Ref("user", uid), logger.Ref("session", id))
+	writeJSON(w, http.StatusOK, updated)
+}
+
+func (d Deps) handleDeleteSession(w http.ResponseWriter, r *http.Request) {
+	if d.Sessions == nil {
+		logAndWriteError(w, http.StatusServiceUnavailable, "sessions are not available", "session_delete_unavailable", nil)
+		return
+	}
+
+	uid := userID(r.Context())
+	id := r.PathValue("id")
+	err := d.Sessions.Delete(r.Context(), uid, id)
+	if errors.Is(err, session.ErrNotFound) {
+		logAndWriteError(w, http.StatusNotFound, "session not found", "session_delete_not_found", err, logger.Ref("user", uid), logger.Ref("session", id))
+		return
+	}
+	if err != nil {
+		logAndWriteError(w, http.StatusInternalServerError, "could not delete session", "session_delete_failed", err, logger.Ref("user", uid), logger.Ref("session", id))
+		return
+	}
+	logger.Info("session_delete_ok", logger.Ref("user", uid), logger.Ref("session", id))
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (req updateSessionRequest) validate() (session.Update, string) {
+	if req.StartedAt.IsZero() || req.EndedAt.IsZero() {
+		return session.Update{}, "started_at and ended_at are required"
+	}
+	if req.EndedAt.Before(req.StartedAt) {
+		return session.Update{}, "ended_at must not be before started_at"
+	}
+	if req.DurationS < 0 {
+		return session.Update{}, "duration_s must be zero or positive"
+	}
+	if req.DistanceM < 0 {
+		return session.Update{}, "distance_m must be zero or positive"
+	}
+	if req.Sprints < 0 {
+		return session.Update{}, "sprints must be zero or positive"
+	}
+	if !inRangeInt(req.HRAvg, 20, 260) || !inRangeInt(req.HRMax, 20, 260) {
+		return session.Update{}, "heart rate values must be between 20 and 260"
+	}
+	if req.SpeedMaxKMH != nil && *req.SpeedMaxKMH < 0 {
+		return session.Update{}, "speed_max_kmh must be zero or positive"
+	}
+	if !inRangeFloat(req.Intensity, 0, 100) {
+		return session.Update{}, "intensity must be between 0 and 100"
+	}
+	if req.CaloriesKcal != nil && *req.CaloriesKcal < 0 {
+		return session.Update{}, "calories_kcal must be zero or positive"
+	}
+	return session.Update{
+		StartedAt:    req.StartedAt,
+		EndedAt:      req.EndedAt,
+		DurationS:    req.DurationS,
+		DistanceM:    req.DistanceM,
+		HRAvg:        req.HRAvg,
+		HRMax:        req.HRMax,
+		SpeedMaxKMH:  req.SpeedMaxKMH,
+		Sprints:      req.Sprints,
+		Intensity:    req.Intensity,
+		CaloriesKcal: req.CaloriesKcal,
+	}, ""
 }
 
 // validate checks the request and returns the session to create, or a non-empty

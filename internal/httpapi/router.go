@@ -36,6 +36,8 @@ func NewRouter(d Deps) http.Handler {
 	mux.HandleFunc("POST /v1/sessions", d.requireAuth(d.handleCreateSession))
 	mux.HandleFunc("GET /v1/sessions", d.requireAuth(d.handleListSessions))
 	mux.HandleFunc("GET /v1/sessions/{id}", d.requireAuth(d.handleGetSession))
+	mux.HandleFunc("PUT /v1/sessions/{id}", d.requireAuth(d.handleUpdateSession))
+	mux.HandleFunc("DELETE /v1/sessions/{id}", d.requireAuth(d.handleDeleteSession))
 
 	mux.Handle("/docs/", httpSwagger.Handler(httpSwagger.URL("/docs/doc.json")))
 	mux.HandleFunc("GET /docs", func(w http.ResponseWriter, r *http.Request) {

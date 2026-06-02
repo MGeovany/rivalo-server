@@ -29,16 +29,14 @@ type updateProfileRequest struct {
 //	@Router			/v1/me [get]
 func (d Deps) handleGetMe(w http.ResponseWriter, r *http.Request) {
 	if d.Profiles == nil {
-		logger.Warn("profile_get_unavailable")
-		writeError(w, http.StatusServiceUnavailable, "profiles are not available")
+		logAndWriteError(w, http.StatusServiceUnavailable, "profiles are not available", "profile_get_unavailable", nil)
 		return
 	}
 
 	uid := userID(r.Context())
 	p, err := d.Profiles.GetOrCreate(r.Context(), uid)
 	if err != nil {
-		logger.Error("profile_get_failed", logger.Ref("user", uid), logger.SafeErr(err))
-		writeError(w, http.StatusInternalServerError, "could not load profile")
+		logAndWriteError(w, http.StatusInternalServerError, "could not load profile", "profile_get_failed", err, logger.Ref("user", uid))
 		return
 	}
 	logger.Info("profile_get_ok", logger.Ref("user", uid))
@@ -61,30 +59,26 @@ func (d Deps) handleGetMe(w http.ResponseWriter, r *http.Request) {
 //	@Router			/v1/me [put]
 func (d Deps) handleUpdateMe(w http.ResponseWriter, r *http.Request) {
 	if d.Profiles == nil {
-		logger.Warn("profile_update_unavailable")
-		writeError(w, http.StatusServiceUnavailable, "profiles are not available")
+		logAndWriteError(w, http.StatusServiceUnavailable, "profiles are not available", "profile_update_unavailable", nil)
 		return
 	}
 
 	var req updateProfileRequest
 	if err := decodeJSON(w, r, &req); err != nil {
-		logger.Warn("profile_update_rejected", "reason", "invalid_json")
-		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		logAndWriteError(w, http.StatusBadRequest, "invalid JSON body", "profile_update_rejected", err, "reason", "invalid_json")
 		return
 	}
 
 	update, msg := req.validate()
 	if msg != "" {
-		logger.Warn("profile_update_rejected", "reason", "validation_failed")
-		writeError(w, http.StatusBadRequest, msg)
+		logAndWriteError(w, http.StatusBadRequest, msg, "profile_update_rejected", nil, "reason", "validation_failed")
 		return
 	}
 
 	uid := userID(r.Context())
 	p, err := d.Profiles.Update(r.Context(), uid, update)
 	if err != nil {
-		logger.Error("profile_update_failed", logger.Ref("user", uid), logger.SafeErr(err))
-		writeError(w, http.StatusInternalServerError, "could not update profile")
+		logAndWriteError(w, http.StatusInternalServerError, "could not update profile", "profile_update_failed", err, logger.Ref("user", uid))
 		return
 	}
 	logger.Info("profile_update_ok", logger.Ref("user", uid))

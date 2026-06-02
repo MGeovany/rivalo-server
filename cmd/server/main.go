@@ -96,6 +96,7 @@ func run() error {
 
 	logger.Info("server_listening", slog.String("port", cfg.Port))
 	if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		logger.Error("server_listen_failed", logger.SafeErr(err))
 		return err
 	}
 	logger.Info("server_stopped")
