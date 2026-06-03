@@ -1,4 +1,4 @@
-// Seed demo user marlongeo1999+mid@gmail.com with profile and 5 fake watch sessions.
+// Seed the App Store review user (appreview@rivalo.app) with profile and fake watch sessions.
 //
 // Usage (from repo root, with .env configured):
 //
@@ -26,8 +26,9 @@ import (
 )
 
 const (
-	demoEmail    = "marlongeo1999+mid@gmail.com"
-	demoPassword = "Rivalo@123"
+	// App Store Connect → App Review Information → Sign-in required.
+	reviewEmail    = "appreview@rivalo.app"
+	reviewPassword = "RivaloReview2026!"
 )
 
 // Pitches seeded for the demo user; sessions reference these by index.
@@ -107,7 +108,8 @@ func main() {
 		log.Fatal("DATABASE_URL, SUPABASE_URL, and SUPABASE_SERVICE_ROLE_KEY must be set in .env")
 	}
 
-	if _, err := ensureAuthUser(ctx, supabaseURL, serviceKey, demoEmail, demoPassword); err != nil {
+	userID, err := ensureAuthUser(ctx, supabaseURL, serviceKey, reviewEmail, reviewPassword)
+	if err != nil {
 		log.Fatal(err)
 	}
 
@@ -117,11 +119,7 @@ func main() {
 	}
 	defer pool.Close()
 
-	userID, err := userIDFromDB(ctx, pool, demoEmail)
-	if err != nil {
-		log.Fatal(err)
-	}
-	log.Printf("auth user %s id=%s", demoEmail, userID)
+	log.Printf("auth user %s id=%s", reviewEmail, userID)
 
 	if err := seedProfile(ctx, pool, userID); err != nil {
 		log.Fatal(err)
@@ -131,7 +129,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	log.Printf("done — profile + %d pitches + %d sessions (context, GPS heatmap, structured halves) for %s / %s", len(demoPitchIDs), sessionCount, demoEmail, demoPassword)
+	log.Printf("done — profile + %d pitches + %d sessions (context, GPS heatmap, structured halves) for %s / %s", len(demoPitchIDs), sessionCount, reviewEmail, reviewPassword)
 }
 
 func ensureAuthUser(ctx context.Context, baseURL, serviceKey, email, password string) (string, error) {
@@ -243,7 +241,7 @@ func userIDFromDB(ctx context.Context, pool *pgxpool.Pool, email string) (string
 func seedProfile(ctx context.Context, pool *pgxpool.Pool, userID string) error {
 	const q = `
 		insert into public.profiles (id, display_name, preferred_position, height_cm, weight_kg, birth_year)
-		values ($1, 'Geovany', 'Midfielder', 170, 70, 1999)
+		values ($1, 'Alex Demo', 'Midfielder', 175, 72, 1995)
 		on conflict (id) do update set
 			display_name = excluded.display_name,
 			preferred_position = excluded.preferred_position,
@@ -496,7 +494,7 @@ func deriveCompetition(matchTag string, index int) string {
 		}
 		return "league"
 	case "training":
-		return "training"
+		return ""
 	default:
 		return ""
 	}

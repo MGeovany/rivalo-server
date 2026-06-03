@@ -7,7 +7,7 @@
 DO $$
 DECLARE
   uid uuid;
-  demo_email constant text := 'marlongeo1999+mid@gmail.com';
+  demo_email constant text := 'appreview@rivalo.app';
   halftime constant int := 2730;
 BEGIN
   SELECT id INTO uid FROM auth.users WHERE email = demo_email;
@@ -16,7 +16,7 @@ BEGIN
   END IF;
 
   INSERT INTO public.profiles (id, display_name, preferred_position, height_cm, weight_kg, birth_year)
-  VALUES (uid, 'Geovany', 'Midfielder', 170, 70, 1999)
+  VALUES (uid, 'Alex Demo', 'Midfielder', 175, 72, 1995)
   ON CONFLICT (id) DO UPDATE SET
     display_name = EXCLUDED.display_name,
     preferred_position = EXCLUDED.preferred_position,

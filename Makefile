@@ -42,7 +42,7 @@ migrate-new:
 migrate-hash:
 	atlas migrate hash --dir file://migrations
 
-# Demo user marlongeo1999+mid@gmail.com / Rivalo@123 + 5 fake watch sessions.
+# App Store review user appreview@rivalo.app / RivaloReview2026! + demo sessions.
 # Requires DATABASE_URL, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY in .env.
 seed:
 	go run ./cmd/seed

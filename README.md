@@ -47,10 +47,11 @@ Migration SQL is hand-authored: the schema references Supabase's managed `auth` 
 - `rivalo-ios` — app iPhone
 - `rivalo-watch` — app Apple Watch
 
-## Seed (demo user)
+## Seed (App Store review user)
 
-Creates (or reuses) auth user `marlongeo1999+mid@gmail.com` with password `Rivalo@123`, a midfielder
-profile, and five fake watch sessions with heart-rate samples.
+Creates (or reuses) auth user `appreview@rivalo.app` with password `RivaloReview2026!`, a midfielder
+profile, and ~20 fake watch sessions with heart-rate samples, GPS paths, and match context.
+Use these credentials in App Store Connect → App Review Information.
 
 ```bash
 # In .env: DATABASE_URL, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY (service role, not anon key)
