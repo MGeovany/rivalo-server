@@ -102,7 +102,10 @@ func (d Deps) handleCreateSession(w http.ResponseWriter, r *http.Request) {
 
 	created, err := d.Sessions.Create(r.Context(), uid, newSession)
 	if err != nil {
-		logAndWriteError(w, http.StatusInternalServerError, "could not create session", "session_create_failed", err, logger.Ref("user", uid))
+		// TEMPORARY DIAGNOSTIC: surface the underlying DB error in the response
+		// so it shows up in the iOS client's PostHog `response_body`. Revert to a
+		// generic message once the create-session 500 is diagnosed.
+		logAndWriteError(w, http.StatusInternalServerError, "could not create session: "+err.Error(), "session_create_failed", err, logger.Ref("user", uid))
 		return
 	}
 
