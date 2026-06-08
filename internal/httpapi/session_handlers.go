@@ -78,16 +78,20 @@ func (d Deps) handleCreateSession(w http.ResponseWriter, r *http.Request) {
 
 	uid := userID(r.Context())
 
-	// Validate pitch_id belongs to user if provided.
+	// Drop an unknown/unowned pitch_id instead of rejecting the whole session.
+	// A watch can carry a court id that was never synced to this user's account
+	// (local-only court, id mismatch); losing the court association is far
+	// better than losing the entire match.
 	if newSession.PitchID != nil {
-		if d.Pitches == nil {
-			logAndWriteError(w, http.StatusServiceUnavailable, "pitches are not available", "session_create_rejected", nil, "reason", "pitches_unavailable")
-			return
+		owns := false
+		if d.Pitches != nil {
+			if ok, err := d.Pitches.OwnedByUser(r.Context(), uid, *newSession.PitchID); err == nil {
+				owns = ok
+			}
 		}
-		owns, err := d.Pitches.OwnedByUser(r.Context(), uid, *newSession.PitchID)
-		if err != nil || !owns {
-			logAndWriteError(w, http.StatusBadRequest, "pitch_id not found or not owned", "session_create_rejected", nil, "reason", "invalid_pitch_id")
-			return
+		if !owns {
+			logger.Warn("session_create_pitch_dropped", logger.Ref("user", uid), logger.Ref("pitch", *newSession.PitchID))
+			newSession.PitchID = nil
 		}
 	}
 
@@ -320,16 +324,18 @@ func (d Deps) handlePatchSessionContext(w http.ResponseWriter, r *http.Request) 
 	uid := userID(r.Context())
 	id := r.PathValue("id")
 
-	// Validate pitch_id belongs to user if changed.
+	// Drop an unknown/unowned pitch_id rather than rejecting the whole context
+	// update (which would also discard match_type/surface). Mirrors create.
 	if cu.PitchID != nil {
-		if d.Pitches == nil {
-			logAndWriteError(w, http.StatusServiceUnavailable, "pitches are not available", "session_patch_rejected", nil, "reason", "pitches_unavailable")
-			return
+		owns := false
+		if d.Pitches != nil {
+			if ok, err := d.Pitches.OwnedByUser(r.Context(), uid, *cu.PitchID); err == nil {
+				owns = ok
+			}
 		}
-		owns, err := d.Pitches.OwnedByUser(r.Context(), uid, *cu.PitchID)
-		if err != nil || !owns {
-			logAndWriteError(w, http.StatusBadRequest, "pitch_id not found or not owned", "session_patch_rejected", nil, "reason", "invalid_pitch_id")
-			return
+		if !owns {
+			logger.Warn("session_patch_pitch_dropped", logger.Ref("user", uid), logger.Ref("pitch", *cu.PitchID))
+			cu.PitchID = nil
 		}
 	}
 

@@ -414,7 +414,7 @@ func TestDeletePitch_NotFound_404(t *testing.T) {
 	}
 }
 
-func TestCreateSession_InvalidPitchID_400(t *testing.T) {
+func TestCreateSession_InvalidPitchID_DroppedNotRejected(t *testing.T) {
 	ps := newFakePitchStore()
 	ss := newFakeSessionStore()
 	d := Deps{Sessions: ss, Pitches: ps, Verifier: auth.NewVerifier(testSecret)}
@@ -423,9 +423,16 @@ func TestCreateSession_InvalidPitchID_400(t *testing.T) {
 	body := validSessionBody()
 	body.PitchID = &badID
 
+	// An unknown pitch_id must not cost the user the whole match: the session is
+	// created with the pitch_id dropped, not rejected.
 	rec := doRequest(t, d, http.MethodPost, "/v1/sessions", "Bearer "+token, body)
-	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("status = %d, want 400; body = %s", rec.Code, rec.Body.String())
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want 201 (pitch dropped); body = %s", rec.Code, rec.Body.String())
+	}
+	var created session.Session
+	_ = json.NewDecoder(rec.Body).Decode(&created)
+	if created.PitchID != nil {
+		t.Errorf("pitch_id should be dropped, got %v", *created.PitchID)
 	}
 }
 
@@ -456,7 +463,7 @@ func TestCreateSession_ValidPitchID(t *testing.T) {
 	}
 }
 
-func TestPatchSessionContext_InvalidPitchID_400(t *testing.T) {
+func TestPatchSessionContext_InvalidPitchID_DroppedNotRejected(t *testing.T) {
 	ps := newFakePitchStore()
 	ss := newFakeSessionStore()
 	d := Deps{Sessions: ss, Pitches: ps, Verifier: auth.NewVerifier(testSecret)}
@@ -466,10 +473,16 @@ func TestPatchSessionContext_InvalidPitchID_400(t *testing.T) {
 	var sessCreated session.Session
 	_ = json.NewDecoder(createRec.Body).Decode(&sessCreated)
 
+	// An unknown pitch_id is dropped; the context update still succeeds.
 	badID := "nonexistent"
 	body := patchSessionRequest{PitchID: &badID}
 	rec := doRequest(t, d, http.MethodPatch, "/v1/sessions/"+sessCreated.ID, "Bearer "+token, body)
-	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("status = %d, want 400; body = %s", rec.Code, rec.Body.String())
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200 (pitch dropped); body = %s", rec.Code, rec.Body.String())
+	}
+	var updated session.Session
+	_ = json.NewDecoder(rec.Body).Decode(&updated)
+	if updated.PitchID != nil {
+		t.Errorf("pitch_id should be dropped, got %v", *updated.PitchID)
 	}
 }
