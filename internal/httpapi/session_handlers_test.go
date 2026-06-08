@@ -681,14 +681,31 @@ func TestCreateSession_InvalidMode_400(t *testing.T) {
 	}
 }
 
-func TestCreateSession_HalftimeOnNonStructured_400(t *testing.T) {
+func TestCreateSession_HalftimeOnQuick_201(t *testing.T) {
 	token := signToken(t, testSecret, "user-1", time.Now().Add(time.Hour))
 	offset := 1000
 	body := validSessionBody() // mode defaults to quick
 	body.HalftimeOffsetS = &offset
 	rec := doRequest(t, sessionDeps(newFakeSessionStore()), http.MethodPost, "/v1/sessions", "Bearer "+token, body)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want 201 (quick supports halftime); body = %s", rec.Code, rec.Body.String())
+	}
+	var created session.Session
+	_ = json.NewDecoder(rec.Body).Decode(&created)
+	if created.HalftimeOffsetS == nil || *created.HalftimeOffsetS != offset {
+		t.Errorf("halftime offset not persisted: %+v", created.HalftimeOffsetS)
+	}
+}
+
+func TestCreateSession_HalftimeOnTraining_400(t *testing.T) {
+	token := signToken(t, testSecret, "user-1", time.Now().Add(time.Hour))
+	offset := 1000
+	body := validSessionBody()
+	body.Mode = session.ModeTraining // training has no half flow
+	body.HalftimeOffsetS = &offset
+	rec := doRequest(t, sessionDeps(newFakeSessionStore()), http.MethodPost, "/v1/sessions", "Bearer "+token, body)
 	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("status = %d, want 400 (halftime only for structured)", rec.Code)
+		t.Fatalf("status = %d, want 400 (training has no halftime)", rec.Code)
 	}
 }
 
