@@ -49,10 +49,19 @@ func (s *PostgresStore) Create(ctx context.Context, userID string, n New) (Sessi
 		return Session{}, err
 	}
 
+	// session_samples and session_path are keyed by (session_id, t_offset_s), so
+	// at most one row per second. A client may emit several points within the
+	// same second (e.g. GPS bursts); keep the first per offset to avoid a
+	// duplicate-key violation that would fail the whole insert.
 	if len(n.Samples) > 0 {
-		rows := make([][]any, len(n.Samples))
-		for i, smp := range n.Samples {
-			rows[i] = []any{sess.ID, smp.TOffsetS, smp.HR, smp.SpeedKMH, smp.Half}
+		seen := make(map[int]bool, len(n.Samples))
+		rows := make([][]any, 0, len(n.Samples))
+		for _, smp := range n.Samples {
+			if seen[smp.TOffsetS] {
+				continue
+			}
+			seen[smp.TOffsetS] = true
+			rows = append(rows, []any{sess.ID, smp.TOffsetS, smp.HR, smp.SpeedKMH, smp.Half})
 		}
 		_, err = tx.CopyFrom(ctx,
 			pgx.Identifier{"public", "session_samples"},
@@ -65,9 +74,14 @@ func (s *PostgresStore) Create(ctx context.Context, userID string, n New) (Sessi
 	}
 
 	if len(n.Path) > 0 {
-		rows := make([][]any, len(n.Path))
-		for i, pt := range n.Path {
-			rows[i] = []any{sess.ID, pt.TOffsetS, pt.Latitude, pt.Longitude}
+		seen := make(map[int]bool, len(n.Path))
+		rows := make([][]any, 0, len(n.Path))
+		for _, pt := range n.Path {
+			if seen[pt.TOffsetS] {
+				continue
+			}
+			seen[pt.TOffsetS] = true
+			rows = append(rows, []any{sess.ID, pt.TOffsetS, pt.Latitude, pt.Longitude})
 		}
 		_, err = tx.CopyFrom(ctx,
 			pgx.Identifier{"public", "session_path"},
