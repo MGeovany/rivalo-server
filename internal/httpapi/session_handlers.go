@@ -456,8 +456,8 @@ func (req createSessionRequest) validate() (session.New, string) {
 		return session.New{}, "mode must be 'quick', 'structured' or 'training'"
 	}
 	if req.HalftimeOffsetS != nil {
-		if mode != session.ModeStructured {
-			return session.New{}, "halftime_offset_s is only valid for a structured match"
+		if !session.ModeUsesHalfFlow(mode) {
+			return session.New{}, "halftime_offset_s is only valid for a quick or structured match"
 		}
 		if *req.HalftimeOffsetS < 0 || *req.HalftimeOffsetS > req.DurationS {
 			return session.New{}, "halftime_offset_s must be within the session duration"

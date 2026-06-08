@@ -24,6 +24,13 @@ const (
 	ModeTraining   = "training"
 )
 
+// ModeUsesHalfFlow reports whether a mode is played in two halves with a
+// halftime break. Mirrors the watch client, where both quick and structured
+// matches run a half flow (and therefore may carry a halftime_offset_s).
+func ModeUsesHalfFlow(mode string) bool {
+	return mode == ModeQuick || mode == ModeStructured
+}
+
 // Valid context enums.
 const (
 	MatchType5aside  = "5-a-side"
