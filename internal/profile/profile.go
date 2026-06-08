@@ -14,6 +14,9 @@ type Profile struct {
 	HeightCM          *int      `json:"height_cm"`
 	WeightKG          *float64  `json:"weight_kg"`
 	BirthYear         *int      `json:"birth_year"`
+	// BirthDate is the full date of birth as "YYYY-MM-DD". birth_year is derived
+	// from it; both are returned for backward compatibility.
+	BirthDate         *string   `json:"birth_date"`
 	CreatedAt         time.Time `json:"created_at"`
 	UpdatedAt         time.Time `json:"updated_at"`
 }
@@ -25,6 +28,7 @@ type Update struct {
 	HeightCM          *int
 	WeightKG          *float64
 	BirthYear         *int
+	BirthDate         *time.Time
 }
 
 // Store persists profiles.

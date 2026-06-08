@@ -3,6 +3,7 @@ package httpapi
 import (
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/MGeovany/rivalo-server/internal/logger"
 	"github.com/MGeovany/rivalo-server/internal/profile"
@@ -15,6 +16,7 @@ type updateProfileRequest struct {
 	HeightCM          *int     `json:"height_cm"`
 	WeightKG          *float64 `json:"weight_kg"`
 	BirthYear         *int     `json:"birth_year"`
+	BirthDate         *string  `json:"birth_date"` // "YYYY-MM-DD"
 }
 
 // handleGetMe returns the authenticated user's profile, creating it on first access.
@@ -123,7 +125,20 @@ func (req updateProfileRequest) validate() (profile.Update, string) {
 		update.WeightKG = req.WeightKG
 	}
 
-	if req.BirthYear != nil {
+	// Prefer the full birth_date; derive birth_year from it so the age-based
+	// HRmax calculation keeps working. Fall back to birth_year for old clients.
+	if req.BirthDate != nil && *req.BirthDate != "" {
+		t, err := time.Parse("2006-01-02", *req.BirthDate)
+		if err != nil {
+			return profile.Update{}, "birth_date must be in YYYY-MM-DD format"
+		}
+		if t.Year() < 1900 || t.After(time.Now()) {
+			return profile.Update{}, "birth_date must be a valid past date from 1900 onward"
+		}
+		update.BirthDate = &t
+		year := t.Year()
+		update.BirthYear = &year
+	} else if req.BirthYear != nil {
 		year := *req.BirthYear
 		if year < 1900 || year > 2020 {
 			return profile.Update{}, "birth_year must be between 1900 and 2020"
