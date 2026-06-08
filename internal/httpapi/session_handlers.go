@@ -203,8 +203,8 @@ func (d Deps) handleGetSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Compute Fatigue Drop for structured sessions on read.
-	if found.Mode == session.ModeStructured && found.HalftimeOffsetS != nil {
+	// Compute Fatigue Drop for half-flow sessions (quick or structured) on read.
+	if session.ModeUsesHalfFlow(found.Mode) && found.HalftimeOffsetS != nil {
 		hrMax := resolveHRMax(r, d, uid, found.HRMax)
 		found.FatigueDrop = session.ComputeFatigueDrop(found.Mode, found.Samples, found.HalftimeOffsetS, hrMax)
 	}

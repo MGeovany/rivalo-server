@@ -130,7 +130,8 @@ type Session struct {
 	Samples []Sample `json:"samples,omitempty"`
 	// Path is the GPS trajectory, populated on detail reads (Get); nil on List.
 	Path []PathPoint `json:"path,omitempty"`
-	// FatigueDrop is computed on-read for structured sessions; nil otherwise.
+	// FatigueDrop is computed on-read for half-flow sessions (quick or
+	// structured) that carry a halftime offset; nil otherwise.
 	FatigueDrop *FatigueDrop `json:"fatigue_drop,omitempty"`
 	// NewRecords lists the personal-best metrics this session broke. Populated
 	// only on the create response when the user already had prior history.

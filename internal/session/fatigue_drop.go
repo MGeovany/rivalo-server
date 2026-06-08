@@ -1,7 +1,7 @@
 package session
 
 // FatigueDrop compares physical metrics between the first and second half
-// of a structured session. Returned on-read (not persisted).
+// of a half-flow session (quick or structured). Returned on-read (not persisted).
 type FatigueDrop struct {
 	FirstHalf  HalfMetrics `json:"first_half"`
 	SecondHalf HalfMetrics `json:"second_half"`
@@ -30,11 +30,11 @@ func highIntensityHRThreshold(hrMax int) int {
 	return int(float64(hrMax) * 0.85)
 }
 
-// ComputeFatigueDrop returns per-half metrics for a structured session. Returns
-// nil when the session is not structured, has no halftime offset, or does not
-// have enough samples in both halves.
+// ComputeFatigueDrop returns per-half metrics for a half-flow session (quick or
+// structured). Returns nil when the session has no half flow, has no halftime
+// offset, or does not have enough samples in both halves.
 func ComputeFatigueDrop(mode string, samples []Sample, halftimeOffsetS *int, hrMax int) *FatigueDrop {
-	if mode != ModeStructured || halftimeOffsetS == nil {
+	if !ModeUsesHalfFlow(mode) || halftimeOffsetS == nil {
 		return nil
 	}
 	if len(samples) < minSamplesPerHalf*2 {

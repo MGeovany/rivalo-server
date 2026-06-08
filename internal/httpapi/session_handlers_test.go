@@ -1245,6 +1245,48 @@ func TestGetSession_FatigueDrop_Structured(t *testing.T) {
 	}
 }
 
+func TestGetSession_FatigueDrop_QuickWithHalves(t *testing.T) {
+	store := newFakeSessionStore()
+	token := signToken(t, testSecret, "user-1", time.Now().Add(time.Hour))
+	hr := 170
+	hrMax := 190
+	half1, half2 := 1, 2
+	offset := 2700
+	body := validSessionBody() // mode defaults to quick
+	body.HalftimeOffsetS = &offset
+	body.HRMax = &hrMax
+	for i := range 20 {
+		h := half1
+		if i >= 10 {
+			h = half2
+		}
+		body.Samples = append(body.Samples, sampleRequest{
+			TOffsetS: i * 300,
+			HR:       &hr,
+			Half:     &h,
+		})
+	}
+
+	createRec := doRequest(t, sessionDeps(store), http.MethodPost, "/v1/sessions", "Bearer "+token, body)
+	if createRec.Code != http.StatusCreated {
+		t.Fatalf("create status = %d, want 201; body = %s", createRec.Code, createRec.Body.String())
+	}
+	var created session.Session
+	_ = json.NewDecoder(createRec.Body).Decode(&created)
+	if created.Mode != session.ModeQuick {
+		t.Fatalf("mode = %q, want quick (default)", created.Mode)
+	}
+
+	getRec := doRequest(t, sessionDeps(store), http.MethodGet, "/v1/sessions/"+created.ID, "Bearer "+token, nil)
+	var detail session.Session
+	if err := json.NewDecoder(getRec.Body).Decode(&detail); err != nil {
+		t.Fatalf("decode detail: %v", err)
+	}
+	if detail.FatigueDrop == nil {
+		t.Fatal("fatigue_drop should not be nil for a quick session with valid halves")
+	}
+}
+
 func TestGetSession_FatigueDrop_NotEnoughSamples(t *testing.T) {
 	store := newFakeSessionStore()
 	token := signToken(t, testSecret, "user-1", time.Now().Add(time.Hour))
