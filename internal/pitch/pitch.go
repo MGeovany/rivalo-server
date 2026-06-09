@@ -24,6 +24,9 @@ type Pitch struct {
 	Surface           *string   `json:"surface,omitempty"`
 	LengthM           *float64  `json:"length_m,omitempty"`
 	WidthM            *float64  `json:"width_m,omitempty"`
+	// HeadingDeg is the bearing of the long axis (own goal -> rival goal) in
+	// degrees from true north. Enables absolute heatmap projection.
+	HeadingDeg        *float64  `json:"heading_deg,omitempty"`
 	MeasurementMethod *string   `json:"measurement_method,omitempty"`
 	Indoor            *bool     `json:"indoor,omitempty"`
 	Notes             *string   `json:"notes,omitempty"`
@@ -40,6 +43,7 @@ type NewPitch struct {
 	Surface           *string
 	LengthM           *float64
 	WidthM            *float64
+	HeadingDeg        *float64
 	MeasurementMethod *string
 	Indoor            *bool
 	Notes             *string
@@ -54,6 +58,7 @@ type PitchUpdate struct {
 	Surface           *string
 	LengthM           *float64
 	WidthM            *float64
+	HeadingDeg        *float64
 	MeasurementMethod *string
 	Indoor            *bool
 	Notes             *string

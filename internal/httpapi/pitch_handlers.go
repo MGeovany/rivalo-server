@@ -17,6 +17,7 @@ type createPitchRequest struct {
 	Surface           *string  `json:"surface"`
 	LengthM           *float64 `json:"length_m"`
 	WidthM            *float64 `json:"width_m"`
+	HeadingDeg        *float64 `json:"heading_deg"`
 	MeasurementMethod *string  `json:"measurement_method"`
 	Indoor            *bool    `json:"indoor"`
 	Notes             *string  `json:"notes"`
@@ -31,6 +32,7 @@ type updatePitchRequest struct {
 	Surface           *string  `json:"surface"`
 	LengthM           *float64 `json:"length_m"`
 	WidthM            *float64 `json:"width_m"`
+	HeadingDeg        *float64 `json:"heading_deg"`
 	MeasurementMethod *string  `json:"measurement_method"`
 	Indoor            *bool    `json:"indoor"`
 	Notes             *string  `json:"notes"`
@@ -234,6 +236,9 @@ func (req createPitchRequest) validate() (pitch.NewPitch, string) {
 	if req.WidthM != nil && *req.WidthM < 0 {
 		return pitch.NewPitch{}, "width_m must be zero or positive"
 	}
+	if req.HeadingDeg != nil && (*req.HeadingDeg < 0 || *req.HeadingDeg >= 360) {
+		return pitch.NewPitch{}, "heading_deg must be between 0 and 360"
+	}
 	return pitch.NewPitch{
 		Name:              req.Name,
 		Latitude:          req.Latitude,
@@ -242,6 +247,7 @@ func (req createPitchRequest) validate() (pitch.NewPitch, string) {
 		Surface:           req.Surface,
 		LengthM:           req.LengthM,
 		WidthM:            req.WidthM,
+		HeadingDeg:        req.HeadingDeg,
 		MeasurementMethod: req.MeasurementMethod,
 		Indoor:            req.Indoor,
 		Notes:             req.Notes,
@@ -257,6 +263,7 @@ func (req updatePitchRequest) toUpdate() pitch.PitchUpdate {
 		Surface:           req.Surface,
 		LengthM:           req.LengthM,
 		WidthM:            req.WidthM,
+		HeadingDeg:        req.HeadingDeg,
 		MeasurementMethod: req.MeasurementMethod,
 		Indoor:            req.Indoor,
 		Notes:             req.Notes,

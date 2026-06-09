@@ -125,6 +125,14 @@ type Session struct {
 	Notes         *string  `json:"notes,omitempty"`
 	PitchID       *string  `json:"pitch_id,omitempty"`
 	MatchRating   *float64 `json:"match_rating,omitempty"`
+	// Geo-reference snapshot: an oriented rectangle (center + heading + size)
+	// the recorded GPS path can be projected onto for absolute-position heatmaps.
+	// Denormalized so it survives pitch edits / unsynced pitches.
+	PitchCenterLat  *float64 `json:"pitch_center_lat,omitempty"`
+	PitchCenterLon  *float64 `json:"pitch_center_lon,omitempty"`
+	PitchHeadingDeg *float64 `json:"pitch_heading_deg,omitempty"`
+	PitchLengthM    *float64 `json:"pitch_length_m,omitempty"`
+	PitchWidthM     *float64 `json:"pitch_width_m,omitempty"`
 	CreatedAt     time.Time `json:"created_at"`
 	// Samples is the time series, populated on detail reads (Get); nil on List.
 	Samples []Sample `json:"samples,omitempty"`
@@ -161,6 +169,12 @@ type New struct {
 	Path         []PathPoint
 	MatchRating  *float64
 	PitchID      *string
+	// Geo-reference snapshot (see Session for details).
+	PitchCenterLat  *float64
+	PitchCenterLon  *float64
+	PitchHeadingDeg *float64
+	PitchLengthM    *float64
+	PitchWidthM     *float64
 }
 
 // RecordEntry is a single personal best for one metric.

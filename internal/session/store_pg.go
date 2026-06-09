@@ -23,15 +23,18 @@ const sessionColumns = `id, user_id, started_at, ended_at, duration_s, distance_
 	hr_avg, hr_max, speed_max_kmh, sprints, intensity, calories_kcal, source,
 	mode, halftime_offset_s, match_type, surface, position, result, feeling,
 	match_tag, pitch_id, match_rating, created_at, opponent,
-	outcome, score, competition, goals, assists, notes`
+	outcome, score, competition, goals, assists, notes,
+	pitch_center_lat, pitch_center_lon, pitch_heading_deg, pitch_length_m, pitch_width_m`
 
 func (s *PostgresStore) Create(ctx context.Context, userID string, n New) (Session, error) {
 	const query = `
 		insert into public.sessions
 			(user_id, started_at, ended_at, duration_s, distance_m,
 			 hr_avg, hr_max, speed_max_kmh, sprints, intensity, calories_kcal, source,
-			 mode, halftime_offset_s, match_rating, pitch_id)
-		values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+			 mode, halftime_offset_s, match_rating, pitch_id,
+			 pitch_center_lat, pitch_center_lon, pitch_heading_deg, pitch_length_m, pitch_width_m)
+		values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16,
+			 $17, $18, $19, $20, $21)
 		returning ` + sessionColumns
 
 	tx, err := s.pool.Begin(ctx)
@@ -44,6 +47,7 @@ func (s *PostgresStore) Create(ctx context.Context, userID string, n New) (Sessi
 		userID, n.StartedAt, n.EndedAt, n.DurationS, n.DistanceM,
 		n.HRAvg, n.HRMax, n.SpeedMaxKMH, n.Sprints, n.Intensity, n.CaloriesKcal, n.Source,
 		n.Mode, n.HalftimeOffsetS, n.MatchRating, n.PitchID,
+		n.PitchCenterLat, n.PitchCenterLon, n.PitchHeadingDeg, n.PitchLengthM, n.PitchWidthM,
 	))
 	if err != nil {
 		return Session{}, err
@@ -760,6 +764,7 @@ func scanSession(r scanRow) (Session, error) {
 		&s.MatchType, &s.Surface, &s.Position, &s.Result, &s.Feeling,
 		&s.MatchTag, &s.PitchID, &s.MatchRating, &s.CreatedAt, &s.Opponent,
 		&s.Outcome, &s.Score, &s.Competition, &s.Goals, &s.Assists, &s.Notes,
+		&s.PitchCenterLat, &s.PitchCenterLon, &s.PitchHeadingDeg, &s.PitchLengthM, &s.PitchWidthM,
 	)
 	return s, err
 }

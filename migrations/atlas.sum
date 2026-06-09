@@ -1,4 +1,4 @@
-h1:FDDo6EJiCJcameptyIiweJlLJFRK92uKgDFoFbX60eY=
+h1:79ilIedwJSpQOsmuSj4B1M6V5Lfy7msTUZDlhNzHCCs=
 20260601000001_init_profiles.sql h1:KJnCzU5uPFz5wVW0u04c8tSOSs1rBBC9fsWDgi6nzLI=
 20260601000002_add_sessions.sql h1:jHWWRC7uycyjrjDG/z97XhNwCDGMoDVYqt00t1sB2Pw=
 20260601000003_add_session_samples.sql h1:Tv7g4wLVJgvFn9nXkOlFburm7IPNbJCqL7/LYkjke3k=
@@ -11,3 +11,4 @@ h1:FDDo6EJiCJcameptyIiweJlLJFRK92uKgDFoFbX60eY=
 20260602000006_competition_training.sql h1:2c8twfD7+A9033BpfuyKAhOCgIc5VGgGsBbPgC3b6RQ=
 20260602000007_personal_goals.sql h1:xleE7uVqb4ISnTI/yQj9K8mrXsAFMhPdNMysVG0QF3A=
 20260609000001_profile_birth_date.sql h1:X6VBWdRiDapc7PH4g8xOfZ6hCFs3VKMTTv4FENx2pkY=
+20260609000002_pitch_geo_reference.sql h1:KK7hY97w0cKR2fdGb37Oyj8JTuHCgOpPzUOuH6BaSO8=

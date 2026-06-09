@@ -27,6 +27,13 @@ type createSessionRequest struct {
 	Samples      []sampleRequest `json:"samples"`
 	Path         []pathPointRequest `json:"path"`
 	PitchID      *string         `json:"pitch_id"`
+	// Geo-reference snapshot of the pitch (oriented rectangle) so the GPS path
+	// can be projected to absolute pitch position. All optional.
+	PitchCenterLat  *float64 `json:"pitch_center_lat"`
+	PitchCenterLon  *float64 `json:"pitch_center_lon"`
+	PitchHeadingDeg *float64 `json:"pitch_heading_deg"`
+	PitchLengthM    *float64 `json:"pitch_length_m"`
+	PitchWidthM     *float64 `json:"pitch_width_m"`
 }
 
 // sampleRequest is one time-series point in a create-session payload.
@@ -503,6 +510,16 @@ func (req createSessionRequest) validate() (session.New, string) {
 		path = append(path, session.PathPoint{TOffsetS: p.TOffsetS, Latitude: p.Latitude, Longitude: p.Longitude})
 	}
 
+	if req.PitchHeadingDeg != nil && (*req.PitchHeadingDeg < 0 || *req.PitchHeadingDeg >= 360) {
+		return session.New{}, "pitch_heading_deg must be between 0 and 360"
+	}
+	if req.PitchCenterLat != nil && (*req.PitchCenterLat < -90 || *req.PitchCenterLat > 90) {
+		return session.New{}, "pitch_center_lat must be between -90 and 90"
+	}
+	if req.PitchCenterLon != nil && (*req.PitchCenterLon < -180 || *req.PitchCenterLon > 180) {
+		return session.New{}, "pitch_center_lon must be between -180 and 180"
+	}
+
 	return session.New{
 		StartedAt:    req.StartedAt,
 		EndedAt:      req.EndedAt,
@@ -520,6 +537,11 @@ func (req createSessionRequest) validate() (session.New, string) {
 		Samples:      samples,
 		Path:         path,
 		PitchID:      req.PitchID,
+		PitchCenterLat:  req.PitchCenterLat,
+		PitchCenterLon:  req.PitchCenterLon,
+		PitchHeadingDeg: req.PitchHeadingDeg,
+		PitchLengthM:    req.PitchLengthM,
+		PitchWidthM:     req.PitchWidthM,
 	}, ""
 }
 
