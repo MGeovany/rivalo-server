@@ -184,7 +184,7 @@ func (d Deps) handleUpdatePitch(w http.ResponseWriter, r *http.Request) {
 //	@Tags			pitches
 //	@Security		BearerAuth
 //	@Param			id	path	string	true	"Pitch id"
-//	@Success		204	{object}	noContent
+//	@Success		204
 //	@Failure		401	{object}	errorResponse
 //	@Failure		404	{object}	errorResponse
 //	@Failure		503	{object}	errorResponse

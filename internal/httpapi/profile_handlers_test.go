@@ -24,6 +24,11 @@ type fakeStore struct {
 	fail     bool
 }
 
+type fakeAuthUsers struct {
+	deleted string
+	fail    bool
+}
+
 func newFakeStore() *fakeStore {
 	return &fakeStore{profiles: map[string]profile.Profile{}}
 }
@@ -54,6 +59,14 @@ func (f *fakeStore) Update(_ context.Context, id string, u profile.Update) (prof
 	}
 	f.profiles[id] = p
 	return p, nil
+}
+
+func (f *fakeAuthUsers) DeleteUser(_ context.Context, id string) error {
+	if f.fail {
+		return errors.New("auth admin failure")
+	}
+	f.deleted = id
+	return nil
 }
 
 func testDeps(store profile.Store) Deps {
@@ -167,6 +180,42 @@ func TestUpdateMe_Valid(t *testing.T) {
 	}
 	if p.DisplayName != "Leo" || p.PreferredPosition == nil || *p.PreferredPosition != "midfielder" {
 		t.Errorf("unexpected profile: %+v", p)
+	}
+}
+
+func TestDeleteMe_Valid(t *testing.T) {
+	admin := &fakeAuthUsers{}
+	d := testDeps(newFakeStore())
+	d.AuthUsers = admin
+	token := signToken(t, testSecret, "user-delete", time.Now().Add(time.Hour))
+
+	rec := doRequest(t, d, http.MethodDelete, "/v1/me", "Bearer "+token, nil)
+
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("status = %d, want 204; body = %s", rec.Code, rec.Body.String())
+	}
+	if admin.deleted != "user-delete" {
+		t.Fatalf("deleted user = %q, want user-delete", admin.deleted)
+	}
+}
+
+func TestDeleteMe_Unavailable_503(t *testing.T) {
+	token := signToken(t, testSecret, "user-delete", time.Now().Add(time.Hour))
+	rec := doRequest(t, testDeps(newFakeStore()), http.MethodDelete, "/v1/me", "Bearer "+token, nil)
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status = %d, want 503", rec.Code)
+	}
+}
+
+func TestDeleteMe_AdminFailure_500(t *testing.T) {
+	d := testDeps(newFakeStore())
+	d.AuthUsers = &fakeAuthUsers{fail: true}
+	token := signToken(t, testSecret, "user-delete", time.Now().Add(time.Hour))
+
+	rec := doRequest(t, d, http.MethodDelete, "/v1/me", "Bearer "+token, nil)
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want 500", rec.Code)
 	}
 }
 

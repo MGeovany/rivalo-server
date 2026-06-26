@@ -21,6 +21,9 @@ type Config struct {
 	// SupabaseJWTSecret is the legacy shared secret for HS256 JWT validation.
 	// Used as a fallback when SupabaseURL is not set.
 	SupabaseJWTSecret string
+	// SupabaseServiceRoleKey is used only by trusted backend code for Supabase
+	// Auth Admin operations such as deleting the authenticated user.
+	SupabaseServiceRoleKey string
 }
 
 // Load reads configuration from the environment, applying sensible defaults.
@@ -31,10 +34,11 @@ func Load() Config {
 	_ = godotenv.Load()
 
 	return Config{
-		Port:              getenv("PORT", "8080"),
-		DatabaseURL:       os.Getenv("DATABASE_URL"),
-		SupabaseURL:       os.Getenv("SUPABASE_URL"),
-		SupabaseJWTSecret: os.Getenv("SUPABASE_JWT_SECRET"),
+		Port:                   getenv("PORT", "8080"),
+		DatabaseURL:            os.Getenv("DATABASE_URL"),
+		SupabaseURL:            os.Getenv("SUPABASE_URL"),
+		SupabaseJWTSecret:      os.Getenv("SUPABASE_JWT_SECRET"),
+		SupabaseServiceRoleKey: os.Getenv("SUPABASE_SERVICE_ROLE_KEY"),
 	}
 }
 

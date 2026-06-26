@@ -38,6 +38,7 @@ func buildHandler() http.Handler {
 	var sessions session.Store
 	var pitches pitch.Store
 	var badges badge.Store
+	var authUsers auth.UserAdmin
 
 	if cfg.DatabaseURL != "" {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -59,14 +60,21 @@ func buildHandler() http.Handler {
 
 	verifier := buildVerifier(cfg)
 	logger.Info("auth_ready", slog.Bool("configured", verifier.Configured()))
+	if cfg.SupabaseURL != "" && cfg.SupabaseServiceRoleKey != "" {
+		authUsers = auth.NewAdminClient(cfg.SupabaseURL, cfg.SupabaseServiceRoleKey)
+		logger.Info("auth_admin_ready")
+	} else {
+		logger.Warn("auth_admin_disabled")
+	}
 
 	return httpapi.NewRouter(httpapi.Deps{
-		DB:       pinger,
-		Profiles: profiles,
-		Sessions: sessions,
-		Pitches:  pitches,
-		Badges:   badges,
-		Verifier: verifier,
+		DB:        pinger,
+		Profiles:  profiles,
+		Sessions:  sessions,
+		Pitches:   pitches,
+		Badges:    badges,
+		Verifier:  verifier,
+		AuthUsers: authUsers,
 	})
 }
 

@@ -88,6 +88,31 @@ func (d Deps) handleUpdateMe(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, p)
 }
 
+// handleDeleteMe permanently deletes the authenticated user's account.
+//
+//	@Summary		Delete my account
+//	@Description	Permanently deletes the authenticated user's Supabase Auth account and cascades owned data.
+//	@Tags			profile
+//	@Security		BearerAuth
+//	@Success		204
+//	@Failure		401	{object}	errorResponse
+//	@Failure		503	{object}	errorResponse
+//	@Router			/v1/me [delete]
+func (d Deps) handleDeleteMe(w http.ResponseWriter, r *http.Request) {
+	if d.AuthUsers == nil {
+		logAndWriteError(w, http.StatusServiceUnavailable, "account deletion is not available", "account_delete_unavailable", nil)
+		return
+	}
+
+	uid := userID(r.Context())
+	if err := d.AuthUsers.DeleteUser(r.Context(), uid); err != nil {
+		logAndWriteError(w, http.StatusInternalServerError, "could not delete account", "account_delete_failed", err, logger.Ref("user", uid))
+		return
+	}
+	logger.Info("account_delete_ok", logger.Ref("user", uid))
+	w.WriteHeader(http.StatusNoContent)
+}
+
 // validate checks the request and returns the sanitized update, or a non-empty
 // message describing the first validation failure.
 func (req updateProfileRequest) validate() (profile.Update, string) {

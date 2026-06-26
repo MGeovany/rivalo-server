@@ -21,13 +21,14 @@ import (
 // Pitches may be nil in environments without a configured database; in that case
 // /health reports the database as disabled and the data endpoints return 503.
 type Deps struct {
-	DB       Pinger
-	Profiles profile.Store
-	Sessions session.Store
-	Pitches  pitch.Store
-	Badges   badge.Store
-	Goals    goal.Store
-	Verifier auth.Verifier
+	DB        Pinger
+	Profiles  profile.Store
+	Sessions  session.Store
+	Pitches   pitch.Store
+	Badges    badge.Store
+	Goals     goal.Store
+	Verifier  auth.Verifier
+	AuthUsers auth.UserAdmin
 }
 
 // NewRouter builds the HTTP handler for the API.
@@ -38,6 +39,7 @@ func NewRouter(d Deps) http.Handler {
 
 	mux.HandleFunc("GET /v1/me", d.requireAuth(d.handleGetMe))
 	mux.HandleFunc("PUT /v1/me", d.requireAuth(d.handleUpdateMe))
+	mux.HandleFunc("DELETE /v1/me", d.requireAuth(d.handleDeleteMe))
 
 	mux.HandleFunc("POST /v1/pitches", d.requireAuth(d.handleCreatePitch))
 	mux.HandleFunc("GET /v1/pitches", d.requireAuth(d.handleListPitches))
